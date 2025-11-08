@@ -28,17 +28,22 @@ func generateDockerCompose(net *Network) error {
 func generateVolumes(net *Network) map[string]interface{} {
 	volumes := make(map[string]interface{})
 
-	// Orderer volumes
+	// Orderer volumes - use just the hostname, not the full FQDN
 	for _, orderer := range net.Orderers {
-		volumes[orderer.Name] = nil
+		// Extract hostname from full name (e.g., "orderer.example.com" -> "orderer")
+		volumeName := orderer.Name
+		volumes[volumeName] = nil
 	}
 
 	// Peer volumes
 	for i, org := range net.Orgs {
 		for j := range org.Peers {
-			volumes[fmt.Sprintf("peer%d.%s", j, org.Domain)] = nil
+			peerVolumeName := fmt.Sprintf("peer%d.%s", j, org.Domain)
+			volumes[peerVolumeName] = nil
+			
 			if org.Peers[j].CouchDB {
-				volumes[fmt.Sprintf("couchdb%d.%s", j, org.Domain)] = nil
+				couchVolumeName := fmt.Sprintf("couchdb%d.%s", j, org.Domain)
+				volumes[couchVolumeName] = nil
 			}
 		}
 		_ = i
@@ -101,7 +106,7 @@ func generateOrdererService(net *Network, orderer *Orderer) map[string]interface
 			fmt.Sprintf("%s/genesis.block:/var/hyperledger/orderer/orderer.genesis.block", net.ConfigPath),
 			fmt.Sprintf("%s/ordererOrganizations/example.com/orderers/%s/msp:/var/hyperledger/orderer/msp", net.CryptoPath, orderer.Name),
 			fmt.Sprintf("%s/ordererOrganizations/example.com/orderers/%s/tls:/var/hyperledger/orderer/tls", net.CryptoPath, orderer.Name),
-			fmt.Sprintf("orderer.%s:/var/hyperledger/production/orderer", orderer.Name),
+			fmt.Sprintf("%s:/var/hyperledger/production/orderer", orderer.Name),
 		},
 		"ports": []string{
 			fmt.Sprintf("%d:%d", orderer.Port, orderer.Port),

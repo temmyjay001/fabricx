@@ -93,7 +93,7 @@ func generateConfigTx(net *Network) error {
 }
 
 func generateConfigTxYAML(net *Network) map[string]interface{} {
-	// Organizations
+	// Organizations - these are the full definitions
 	organizations := []map[string]interface{}{
 		{
 			"Name":   "OrdererOrg",
@@ -116,7 +116,7 @@ func generateConfigTxYAML(net *Network) map[string]interface{} {
 		},
 	}
 
-	// Add peer organizations
+	// Add peer organizations with full definitions
 	for _, org := range net.Orgs {
 		peerOrg := map[string]interface{}{
 			"Name":   org.Name,
@@ -247,11 +247,13 @@ func generateConfigTxYAML(net *Network) map[string]interface{} {
 		},
 	}
 
-	// Profiles
-	orgNames := []string{}
-	for _, org := range net.Orgs {
-		orgNames = append(orgNames, org.Name)
-	}
+	// Profiles - reference organizations by their &OrgName anchor
+	// In YAML, we'll use the actual organization struct reference
+	// The key insight: in the Profiles, we need to reference the SAME map objects
+	// that are in the Organizations array, not create new ones or use strings
+	
+	ordererOrg := organizations[0] // OrdererOrg
+	peerOrgs := organizations[1:]  // All peer orgs
 
 	profiles := map[string]interface{}{
 		"FabricXOrdererGenesis": map[string]interface{}{
@@ -266,20 +268,97 @@ func generateConfigTxYAML(net *Network) map[string]interface{} {
 					"AbsoluteMaxBytes":  "99 MB",
 					"PreferredMaxBytes": "512 KB",
 				},
-				"Organizations": []string{"OrdererOrg"},
+				"Organizations": []interface{}{ordererOrg},
+				"Policies": map[string]interface{}{
+					"Readers": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "ANY Readers",
+					},
+					"Writers": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "ANY Writers",
+					},
+					"Admins": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "MAJORITY Admins",
+					},
+					"BlockValidation": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "ANY Writers",
+					},
+				},
+				"Capabilities": map[string]interface{}{
+					"V2_0": true,
+				},
 			},
 			"Consortiums": map[string]interface{}{
 				"FabricXConsortium": map[string]interface{}{
-					"Organizations": orgNames,
+					"Organizations": peerOrgs,
+				},
+			},
+			"Capabilities": map[string]interface{}{
+				"V2_0": true,
+			},
+			"Policies": map[string]interface{}{
+				"Readers": map[string]interface{}{
+					"Type": "ImplicitMeta",
+					"Rule": "ANY Readers",
+				},
+				"Writers": map[string]interface{}{
+					"Type": "ImplicitMeta",
+					"Rule": "ANY Writers",
+				},
+				"Admins": map[string]interface{}{
+					"Type": "ImplicitMeta",
+					"Rule": "MAJORITY Admins",
 				},
 			},
 		},
 		net.Channel.ProfileName: map[string]interface{}{
 			"Consortium": "FabricXConsortium",
+			"Policies": map[string]interface{}{
+				"Readers": map[string]interface{}{
+					"Type": "ImplicitMeta",
+					"Rule": "ANY Readers",
+				},
+				"Writers": map[string]interface{}{
+					"Type": "ImplicitMeta",
+					"Rule": "ANY Writers",
+				},
+				"Admins": map[string]interface{}{
+					"Type": "ImplicitMeta",
+					"Rule": "MAJORITY Admins",
+				},
+			},
+			"Capabilities": map[string]interface{}{
+				"V2_0": true,
+			},
 			"Application": map[string]interface{}{
-				"Organizations": orgNames,
+				"Organizations": peerOrgs,
 				"Capabilities": map[string]interface{}{
 					"V2_0": true,
+				},
+				"Policies": map[string]interface{}{
+					"Readers": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "ANY Readers",
+					},
+					"Writers": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "ANY Writers",
+					},
+					"Admins": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "MAJORITY Admins",
+					},
+					"LifecycleEndorsement": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "MAJORITY Endorsement",
+					},
+					"Endorsement": map[string]interface{}{
+						"Type": "ImplicitMeta",
+						"Rule": "MAJORITY Endorsement",
+					},
 				},
 			},
 		},
