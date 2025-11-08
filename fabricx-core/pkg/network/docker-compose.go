@@ -61,6 +61,7 @@ func generateServices(net *Network) map[string]interface{} {
 	}
 
 	// Add CA, peer, and CouchDB services for each org
+	globalPeerIndex := 0
 	for _, org := range net.Orgs {
 		// CA service
 		caName := fmt.Sprintf("ca.%s", org.Domain)
@@ -72,7 +73,8 @@ func generateServices(net *Network) map[string]interface{} {
 				couchName := fmt.Sprintf("couchdb%d.%s", i, org.Domain)
 				services[couchName] = generateCouchDBService(net, org, peer, i)
 			}
-			services[peer.Name] = generatePeerService(net, org, peer, i)
+			services[peer.Name] = generatePeerService(net, org, peer, i, globalPeerIndex)
+			globalPeerIndex++
 		}
 	}
 
@@ -138,7 +140,7 @@ func generateCAService(net *Network, org *Organization) map[string]interface{} {
 	}
 }
 
-func generatePeerService(net *Network, org *Organization, peer *Peer, index int) map[string]interface{} {
+func generatePeerService(net *Network, org *Organization, peer *Peer, index int, globalIndex int) map[string]interface{} {
 	service := map[string]interface{}{
 		"container_name": peer.Name,
 		"image":          "hyperledger/fabric-peer:2.5",
@@ -169,7 +171,7 @@ func generatePeerService(net *Network, org *Organization, peer *Peer, index int)
 		},
 		"ports": []string{
 			fmt.Sprintf("%d:%d", peer.Port, peer.Port),
-			fmt.Sprintf("%d:9443", 9443+(index*1000)),
+			fmt.Sprintf("%d:9443", 9443+(globalIndex*1000)),
 		},
 		"networks": []string{"fabricx"},
 	}
