@@ -1,0 +1,23 @@
+{
+  "name": "@fabricx/sdk",
+  "version": "1.0.0",
+  "description": "SDK for FabricX",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Hyperledger",
+    "Fabric",
+    "SDK"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "typescript": "^5.4.5"
+  }
+}

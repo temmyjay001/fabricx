@@ -1,0 +1,10 @@
+version: '3.7'
+
+services:
+  cryptogen:
+    container_name: cryptogen
+    image: hyperledger/fabric-tools:2.4
+    command: generate --config=/etc/hyperledger/fabric/crypto-config.yaml --output=/etc/hyperledger/fabric/crypto-config
+    volumes:
+      - ./config/crypto-config.yaml:/etc/hyperledger/fabric/crypto-config.yaml
+      - ./crypto-config:/etc/hyperledger/fabric/crypto-config

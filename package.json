@@ -1,0 +1,16 @@
+{
+  "name": "fabricx-monorepo",
+  "version": "1.0.0",
+  "description": "FabricX Developer Toolkit Monorepo",
+  "private": true,
+  "workspaces": [
+    "cli",
+    "sdk"
+  ],
+  "scripts": {
+    "install": "npm run bootstrap",
+    "bootstrap": "npm install --workspace cli --workspace sdk",
+    "build": "npm run build --workspace cli --workspace sdk",
+    "test": "npm test --workspace cli --workspace sdk"
+  }
+}
