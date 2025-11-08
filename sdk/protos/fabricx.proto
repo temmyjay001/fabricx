@@ -1,0 +1,118 @@
+// protos/fabricx.proto
+syntax = "proto3";
+
+package fabricx;
+
+option go_package = "github.com/temmyjay001/fabricx-core/pkg/grpcserver";
+
+service FabricXService {
+  rpc InitNetwork(InitNetworkRequest) returns (InitNetworkResponse);
+  rpc DeployChaincode(DeployChaincodeRequest) returns (DeployChaincodeResponse);
+  rpc InvokeTransaction(InvokeTransactionRequest) returns (InvokeTransactionResponse);
+  rpc QueryLedger(QueryLedgerRequest) returns (QueryLedgerResponse);
+  rpc StopNetwork(StopNetworkRequest) returns (StopNetworkResponse);
+  rpc GetNetworkStatus(NetworkStatusRequest) returns (NetworkStatusResponse);
+  rpc StreamLogs(StreamLogsRequest) returns (stream LogMessage);
+}
+
+message InitNetworkRequest {
+  string network_name = 1;
+  int32 num_orgs = 2;
+  string channel_name = 3;
+  map<string, string> config = 4;
+}
+
+message InitNetworkResponse {
+  bool success = 1;
+  string message = 2;
+  string network_id = 3;
+  repeated string endpoints = 4;
+}
+
+message DeployChaincodeRequest {
+  string network_id = 1;
+  string chaincode_name = 2;
+  string chaincode_path = 3;
+  string version = 4;
+  string language = 5;
+  repeated string endorsement_policy_orgs = 6;
+}
+
+message DeployChaincodeResponse {
+  bool success = 1;
+  string message = 2;
+  string chaincode_id = 3;
+}
+
+message InvokeTransactionRequest {
+  string network_id = 1;
+  string chaincode_name = 2;
+  string function_name = 3;
+  repeated string args = 4;
+  bool transient = 5;
+}
+
+message InvokeTransactionResponse {
+  bool success = 1;
+  string message = 2;
+  string transaction_id = 3;
+  bytes payload = 4;
+}
+
+message QueryLedgerRequest {
+  string network_id = 1;
+  string chaincode_name = 2;
+  string function_name = 3;
+  repeated string args = 4;
+}
+
+message QueryLedgerResponse {
+  bool success = 1;
+  string message = 2;
+  bytes payload = 3;
+}
+
+message StopNetworkRequest {
+  string network_id = 1;
+  bool cleanup = 2;
+}
+
+message StopNetworkResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message NetworkStatusRequest {
+  string network_id = 1;
+}
+
+message NetworkStatusResponse {
+  bool running = 1;
+  string status = 2;
+  repeated PeerStatus peers = 3;
+  repeated OrdererStatus orderers = 4;
+}
+
+message PeerStatus {
+  string name = 1;
+  string org = 2;
+  string status = 3;
+  string endpoint = 4;
+}
+
+message OrdererStatus {
+  string name = 1;
+  string status = 2;
+  string endpoint = 3;
+}
+
+message StreamLogsRequest {
+  string network_id = 1;
+  string container_name = 2;
+}
+
+message LogMessage {
+  string timestamp = 1;
+  string container = 2;
+  string message = 3;
+}

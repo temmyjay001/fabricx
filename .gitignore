@@ -1,5 +1,47 @@
+# This file is a combination of the root and sdk gitignore files.
+
 node_modules
 logs
 
 bin
 tmp
+
+// Dependencies
+node_modules/
+
+// Build output
+dist/
+*.tsbuildinfo
+
+// Coverage
+coverage/
+.nyc_output/
+
+// Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+// Environment
+.env
+.env.local
+.env.*.local
+
+// IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+// OS
+.DS_Store
+Thumbs.db
+
+// Test
+.jest-cache/
+
+// Documentation
+docs/

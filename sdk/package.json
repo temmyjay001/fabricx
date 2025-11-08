@@ -1,23 +1,62 @@
 {
   "name": "@fabricx/sdk",
   "version": "1.0.0",
-  "description": "SDK for FabricX",
+  "description": "Production-grade TypeScript SDK for FabricX - A developer-friendly toolkit for Hyperledger Fabric",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc && npm run copy-proto",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "copy-proto": "mkdir -p dist/protos && cp ../fabricx-core/protos/fabricx.proto dist/protos/",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "type-check": "tsc --noEmit",
+    "docs": "typedoc --out docs src/index.ts"
   },
   "keywords": [
-    "Hyperledger",
-    "Fabric",
-    "SDK"
+    "hyperledger",
+    "fabric",
+    "blockchain",
+    "sdk",
+    "fabricx",
+    "distributed-ledger",
+    "enterprise-blockchain",
+    "grpc",
+    "typescript"
   ],
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@types/node": "^20.12.12",
-    "typescript": "^5.4.5"
+  "author": "FabricX Contributors",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/temmyjay001/fabricx.git",
+    "directory": "sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/temmyjay001/fabricx/issues"
+  },
+  "homepage": "https://github.com/temmyjay001/fabricx#readme",
+  "files": [
+    "dist",
+    "protos",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.10.0",
+    "@grpc/proto-loader": "^0.7.12"
+  },
+  "peerDependencies": {},
+  "publishConfig": {
+    "access": "public"
   }
 }
