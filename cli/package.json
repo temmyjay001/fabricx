@@ -1,27 +1,68 @@
 {
   "name": "@fabricx/cli",
   "version": "1.0.0",
-  "description": "CLI for FabricX",
+  "description": "Command-line interface for FabricX Developer Toolkit",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "bin": {
+    "fabricx": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "dev": "ts-node src/index.ts",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "keywords": [
-    "Hyperledger",
-    "Fabric",
-    "CLI"
+    "hyperledger",
+    "fabric",
+    "blockchain",
+    "cli",
+    "fabricx",
+    "command-line"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "FabricX Contributors",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/temmyjay001/fabricx.git",
+    "directory": "cli"
+  },
+  "bugs": {
+    "url": "https://github.com/temmyjay001/fabricx/issues"
+  },
+  "homepage": "https://github.com/temmyjay001/fabricx#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@fabricx/sdk": "1.0.0",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",
+    "@typescript-eslint/eslint-plugin": "^7.10.0",
+    "@typescript-eslint/parser": "^7.10.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.5",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -1,5 +1,3 @@
-version: '3.7'
-
 services:
   orderer.example.com:
     container_name: orderer.example.com
