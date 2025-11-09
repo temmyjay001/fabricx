@@ -75,7 +75,7 @@ func TestCheckDockerAvailable(t *testing.T) {
 			mockExec := executor.NewMockExecutor()
 			tt.setup(mockExec)
 
-			mgr := NewManagerWithExecutor(mockExec)
+			mgr := NewManager(mockExec)
 			ctx := context.Background()
 
 			err := mgr.CheckDockerAvailable(ctx)
@@ -133,7 +133,7 @@ func TestStartNetwork(t *testing.T) {
 			mockExec := executor.NewMockExecutor()
 			tt.setup(mockExec)
 
-			mgr := NewManagerWithExecutor(mockExec)
+			mgr := NewManager(mockExec)
 			ctx := context.Background()
 
 			err := mgr.StartNetwork(ctx, tt.network)
@@ -197,7 +197,7 @@ func TestStopNetwork(t *testing.T) {
 				return []byte("Stopping containers... done"), nil
 			}
 
-			mgr := NewManagerWithExecutor(mockExec)
+			mgr := NewManager(mockExec)
 			net := &MockNetwork{
 				id:         "test-net-123",
 				configPath: "/tmp/test",
@@ -250,7 +250,7 @@ func TestGetNetworkStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockExec := executor.NewMockExecutor()
-			mgr := NewManagerWithExecutor(mockExec)
+			mgr := NewManager(mockExec)
 			net := &MockNetwork{
 				id:         "test-net-123",
 				configPath: "/tmp/test",
@@ -315,7 +315,7 @@ func TestExecuteInContainer(t *testing.T) {
 			mockExec := executor.NewMockExecutor()
 			tt.setup(mockExec)
 
-			mgr := NewManagerWithExecutor(mockExec)
+			mgr := NewManager(mockExec)
 			ctx := context.Background()
 
 			output, err := mgr.ExecuteInContainer(ctx, tt.containerName, tt.command)
@@ -344,7 +344,7 @@ func TestContextCancellation(t *testing.T) {
 			}
 		}
 
-		mgr := NewManagerWithExecutor(mockExec)
+		mgr := NewManager(mockExec)
 		net := &MockNetwork{
 			id:         "test-net-123",
 			configPath: "/tmp/test",

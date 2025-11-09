@@ -26,12 +26,7 @@ type NetworkState struct {
 }
 
 // NewManager creates a new Docker manager
-func NewManager() *Manager {
-	return NewManagerWithExecutor(executor.NewRealExecutor())
-}
-
-// NewManagerWithExecutor creates a manager with custom executor (for testing)
-func NewManagerWithExecutor(exec executor.Executor) *Manager {
+func NewManager(exec executor.Executor) *Manager {
 	return &Manager{
 		networks: make(map[string]*NetworkState),
 		exec:     exec,

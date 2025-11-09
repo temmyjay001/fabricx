@@ -117,8 +117,8 @@ func TestDeploy(t *testing.T) {
 			tt.setup(mockExec)
 
 			net := createMockNetwork()
-			dockerMgr := docker.NewManagerWithExecutor(mockExec)
-			deployer := NewDeployerWithExecutor(net, dockerMgr, mockExec)
+			dockerMgr := docker.NewManager(mockExec)
+			deployer := NewDeployer(net, dockerMgr, mockExec)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -159,8 +159,8 @@ func TestDeployContextCancellation(t *testing.T) {
 	}
 
 	net := createMockNetwork()
-	dockerMgr := docker.NewManagerWithExecutor(mockExec)
-	deployer := NewDeployerWithExecutor(net, dockerMgr, mockExec)
+	dockerMgr := docker.NewManager(mockExec)
+	deployer := NewDeployer(net, dockerMgr, mockExec)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -233,8 +233,8 @@ func TestGetPackageID(t *testing.T) {
 			tt.setup(mockExec)
 
 			net := createMockNetwork()
-			dockerMgr := docker.NewManagerWithExecutor(mockExec)
-			deployer := NewDeployerWithExecutor(net, dockerMgr, mockExec)
+			dockerMgr := docker.NewManager(mockExec)
+			deployer := NewDeployer(net, dockerMgr, mockExec)
 
 			ctx := context.Background()
 			org := net.Orgs[0]
@@ -278,8 +278,8 @@ func TestBuildEndorsementPolicy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			net := createMockNetwork()
-			dockerMgr := docker.NewManagerWithExecutor(executor.NewMockExecutor())
-			deployer := NewDeployerWithExecutor(net, dockerMgr, executor.NewMockExecutor())
+			dockerMgr := docker.NewManager(executor.NewMockExecutor())
+			deployer := NewDeployer(net, dockerMgr, executor.NewMockExecutor())
 
 			policy := deployer.buildEndorsementPolicy(tt.orgs)
 
@@ -341,7 +341,7 @@ func TestInvoke(t *testing.T) {
 			tt.setup(mockExec)
 
 			net := createMockNetwork()
-			invoker := NewInvokerWithExecutor(net, mockExec)
+			invoker := NewInvoker(net, mockExec)
 
 			ctx := context.Background()
 			txID, _, err := invoker.Invoke(ctx, tt.chaincode, tt.function, tt.args)
@@ -400,7 +400,7 @@ func TestQuery(t *testing.T) {
 			tt.setup(mockExec)
 
 			net := createMockNetwork()
-			invoker := NewInvokerWithExecutor(net, mockExec)
+			invoker := NewInvoker(net, mockExec)
 
 			ctx := context.Background()
 			data, err := invoker.Query(ctx, tt.chaincode, tt.function, tt.args)
@@ -418,7 +418,7 @@ func TestQuery(t *testing.T) {
 
 func TestBuildArgsJSON(t *testing.T) {
 	net := createMockNetwork()
-	invoker := NewInvokerWithExecutor(net, executor.NewMockExecutor())
+	invoker := NewInvoker(net, executor.NewMockExecutor())
 
 	tests := []struct {
 		name     string
@@ -452,7 +452,7 @@ func TestBuildArgsJSON(t *testing.T) {
 
 func TestExtractTxID(t *testing.T) {
 	net := createMockNetwork()
-	invoker := NewInvokerWithExecutor(net, executor.NewMockExecutor())
+	invoker := NewInvoker(net, executor.NewMockExecutor())
 
 	tests := []struct {
 		name   string
@@ -497,8 +497,8 @@ func BenchmarkDeploy(b *testing.B) {
 	}
 
 	net := createMockNetwork()
-	dockerMgr := docker.NewManagerWithExecutor(mockExec)
-	deployer := NewDeployerWithExecutor(net, dockerMgr, mockExec)
+	dockerMgr := docker.NewManager(mockExec)
+	deployer := NewDeployer(net, dockerMgr, mockExec)
 
 	req := &DeployRequest{
 		Name:    "mycc",
@@ -521,7 +521,7 @@ func BenchmarkInvoke(b *testing.B) {
 	}
 
 	net := createMockNetwork()
-	invoker := NewInvokerWithExecutor(net, mockExec)
+	invoker := NewInvoker(net, mockExec)
 
 	ctx := context.Background()
 

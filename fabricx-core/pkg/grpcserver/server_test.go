@@ -57,8 +57,8 @@ func TestInitNetwork(t *testing.T) {
 			mockExec := executor.NewMockExecutor()
 			tt.setup(mockExec)
 			
-			dockerMgr := docker.NewManagerWithExecutor(mockExec)
-			server := NewFabricXServerWithManager(dockerMgr)
+			dockerMgr := docker.NewManager(mockExec)
+			server := NewFabricXServer(dockerMgr)
 			
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -97,8 +97,8 @@ func TestInitNetworkContextCancellation(t *testing.T) {
 		}
 	}
 	
-	dockerMgr := docker.NewManagerWithExecutor(mockExec)
-	server := NewFabricXServerWithManager(dockerMgr)
+	dockerMgr := docker.NewManager(mockExec)
+	server := NewFabricXServer(dockerMgr)
 	
 	// Context with short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -158,10 +158,10 @@ func TestDeployChaincode(t *testing.T) {
 			mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 				return []byte("success"), nil
 			}
-			
-			dockerMgr := docker.NewManagerWithExecutor(mockExec)
-			server := NewFabricXServerWithManager(dockerMgr)
-			
+
+			dockerMgr := docker.NewManager(mockExec)
+			server := NewFabricXServer(dockerMgr)
+
 			// Setup network if needed
 			if tt.setupNet {
 				// Add a mock network to the server
@@ -218,10 +218,10 @@ func TestStopNetwork(t *testing.T) {
 			mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 				return []byte("stopped"), nil
 			}
-			
-			dockerMgr := docker.NewManagerWithExecutor(mockExec)
-			server := NewFabricXServerWithManager(dockerMgr)
-			
+
+			dockerMgr := docker.NewManager(mockExec)
+			server := NewFabricXServer(dockerMgr)
+
 			if tt.setupNet {
 				// Add mock network
 				server.networksMu.Lock()
@@ -249,9 +249,9 @@ func TestGetNetworkStatus(t *testing.T) {
 		// Simulate 3 running containers
 		return []byte("container1\ncontainer2\ncontainer3"), nil
 	}
-	
-	dockerMgr := docker.NewManagerWithExecutor(mockExec)
-	server := NewFabricXServerWithManager(dockerMgr)
+
+	dockerMgr := docker.NewManager(mockExec)
+	server := NewFabricXServer(dockerMgr)
 	
 	// Test with non-existent network
 	ctx := context.Background()
@@ -278,8 +278,8 @@ func TestServerShutdown(t *testing.T) {
 		return []byte("success"), nil
 	}
 	
-	dockerMgr := docker.NewManagerWithExecutor(mockExec)
-	server := NewFabricXServerWithManager(dockerMgr)
+	dockerMgr := docker.NewManager(mockExec)
+	server := NewFabricXServer(dockerMgr)
 	
 	// Add some mock networks
 	server.networksMu.Lock()
@@ -310,8 +310,8 @@ func BenchmarkInitNetwork(b *testing.B) {
 		return []byte("success"), nil
 	}
 	
-	dockerMgr := docker.NewManagerWithExecutor(mockExec)
-	server := NewFabricXServerWithManager(dockerMgr)
+	dockerMgr := docker.NewManager(mockExec)
+	server := NewFabricXServer(dockerMgr)
 	
 	req := &InitNetworkRequest{
 		NetworkName: "bench-network",
@@ -333,8 +333,8 @@ func BenchmarkGetNetworkStatus(b *testing.B) {
 		return []byte("container1\ncontainer2"), nil
 	}
 	
-	dockerMgr := docker.NewManagerWithExecutor(mockExec)
-	server := NewFabricXServerWithManager(dockerMgr)
+	dockerMgr := docker.NewManager(mockExec)
+	server := NewFabricXServer(dockerMgr)
 	
 	// Setup a network
 	server.networksMu.Lock()

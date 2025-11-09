@@ -17,11 +17,7 @@ type Invoker struct {
 	exec    executor.Executor
 }
 
-func NewInvoker(net *network.Network) *Invoker {
-	return NewInvokerWithExecutor(net, executor.NewRealExecutor())
-}
-
-func NewInvokerWithExecutor(net *network.Network, exec executor.Executor) *Invoker {
+func NewInvoker(net *network.Network, exec executor.Executor) *Invoker {
 	return &Invoker{
 		network: net,
 		exec:    exec,

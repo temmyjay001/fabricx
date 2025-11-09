@@ -76,7 +76,7 @@ func TestBootstrap(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			net, err := BootstrapWithExecutor(ctx, tt.config, mockExec)
+			net, err := Bootstrap(ctx, tt.config, mockExec)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Bootstrap() error = %v, wantErr %v", err, tt.wantErr)
@@ -136,7 +136,7 @@ func TestBootstrapContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	net, err := BootstrapWithExecutor(ctx, config, mockExec)
+	net, err := Bootstrap(ctx, config, mockExec)
 
 	if err == nil {
 		t.Error("Expected error due to context cancellation")
@@ -382,7 +382,7 @@ func TestCleanup(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	net, err := BootstrapWithExecutor(ctx, config, mockExec)
+	net, err := Bootstrap(ctx, config, mockExec)
 	if err != nil {
 		t.Fatalf("Failed to bootstrap network: %v", err)
 	}
@@ -460,7 +460,7 @@ func BenchmarkBootstrap(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		net, err := BootstrapWithExecutor(ctx, config, mockExec)
+		net, err := Bootstrap(ctx, config, mockExec)
 		if err != nil {
 			b.Fatal(err)
 		}

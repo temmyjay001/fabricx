@@ -61,17 +61,7 @@ type Channel struct {
 }
 
 // Bootstrap creates a new network with real executor
-func Bootstrap(config *Config) (*Network, error) {
-	return BootstrapWithContext(context.Background(), config)
-}
-
-// BootstrapWithContext creates a network with context support
-func BootstrapWithContext(ctx context.Context, config *Config) (*Network, error) {
-	return BootstrapWithExecutor(ctx, config, executor.NewRealExecutor())
-}
-
-// BootstrapWithExecutor creates a network with custom executor (for testing)
-func BootstrapWithExecutor(ctx context.Context, config *Config, exec executor.Executor) (*Network, error) {
+func Bootstrap(ctx context.Context, config *Config, exec executor.Executor) (*Network, error) {
 	// Check context
 	if err := ctx.Err(); err != nil {
 		return nil, errors.Wrap("Bootstrap", err)
@@ -321,12 +311,4 @@ func (n *Network) Cleanup() error {
 		})
 	}
 	return nil
-}
-
-// Helper to get executor
-func (n *Network) GetExecutor() executor.Executor {
-	if n.exec == nil {
-		n.exec = executor.NewRealExecutor()
-	}
-	return n.exec
 }

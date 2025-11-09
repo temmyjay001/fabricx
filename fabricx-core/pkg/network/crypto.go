@@ -33,7 +33,7 @@ func generateCrypto(ctx context.Context, net *Network) error {
 	}
 
 	// Run cryptogen inside Docker container
-	exec := net.GetExecutor()
+	exec := net.exec
 	output, err := exec.ExecuteCombined(ctx, "docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:/config", net.ConfigPath),
 		"-v", fmt.Sprintf("%s:/crypto-config", net.CryptoPath),
@@ -385,7 +385,7 @@ func generateGenesisBlock(ctx context.Context, net *Network) error {
 		return errors.Wrap("generateGenesisBlock", err)
 	}
 
-	exec := net.GetExecutor()
+	exec := net.exec
 	output, err := exec.ExecuteCombined(ctx, "docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:/config", net.ConfigPath),
 		"-v", fmt.Sprintf("%s:/crypto-config", net.CryptoPath),
@@ -415,7 +415,7 @@ func generateChannelTx(ctx context.Context, net *Network) error {
 
 	channelTxPath := fmt.Sprintf("%s.tx", net.Channel.Name)
 
-	exec := net.GetExecutor()
+	exec := net.exec
 	output, err := exec.ExecuteCombined(ctx, "docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:/config", net.ConfigPath),
 		"-v", fmt.Sprintf("%s:/crypto-config", net.CryptoPath),

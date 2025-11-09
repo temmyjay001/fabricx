@@ -10,6 +10,7 @@ import (
 	"github.com/temmyjay001/fabricx-core/pkg/chaincode"
 	"github.com/temmyjay001/fabricx-core/pkg/docker"
 	"github.com/temmyjay001/fabricx-core/pkg/errors"
+	"github.com/temmyjay001/fabricx-core/pkg/executor"
 	"github.com/temmyjay001/fabricx-core/pkg/network"
 )
 
@@ -20,15 +21,7 @@ type FabricXServer struct {
 	dockerMgr  *docker.Manager
 }
 
-func NewFabricXServer() *FabricXServer {
-	return &FabricXServer{
-		networks:  make(map[string]*network.Network),
-		dockerMgr: docker.NewManager(),
-	}
-}
-
-// NewFabricXServerWithManager creates server with custom docker manager (for testing)
-func NewFabricXServerWithManager(mgr *docker.Manager) *FabricXServer {
+func NewFabricXServer(mgr *docker.Manager) *FabricXServer {
 	return &FabricXServer{
 		networks:  make(map[string]*network.Network),
 		dockerMgr: mgr,
@@ -55,7 +48,7 @@ func (s *FabricXServer) InitNetwork(ctx context.Context, req *InitNetworkRequest
 	}
 
 	// Bootstrap the network with context
-	net, err := network.BootstrapWithContext(ctx, config)
+	net, err := network.Bootstrap(ctx, config, executor.NewRealExecutor())
 	if err != nil {
 		if errors.IsTimeout(err) {
 			return &InitNetworkResponse{
@@ -135,7 +128,7 @@ func (s *FabricXServer) DeployChaincode(ctx context.Context, req *DeployChaincod
 	}
 
 	// Create chaincode deployer
-	deployer := chaincode.NewDeployer(net, s.dockerMgr)
+	deployer := chaincode.NewDeployer(net, s.dockerMgr, executor.NewRealExecutor())
 
 	// Deploy chaincode with context
 	ccID, err := deployer.Deploy(ctx, &chaincode.DeployRequest{
@@ -192,7 +185,7 @@ func (s *FabricXServer) InvokeTransaction(ctx context.Context, req *InvokeTransa
 	}
 
 	// Create transaction invoker
-	invoker := chaincode.NewInvoker(net)
+	invoker := chaincode.NewInvoker(net, executor.NewRealExecutor())
 
 	// Invoke transaction with context
 	txID, payload, err := invoker.Invoke(ctx, req.ChaincodeName, req.FunctionName, req.Args)
@@ -243,7 +236,7 @@ func (s *FabricXServer) QueryLedger(ctx context.Context, req *QueryLedgerRequest
 	}
 
 	// Create query executor
-	invoker := chaincode.NewInvoker(net)
+	invoker := chaincode.NewInvoker(net, executor.NewRealExecutor())
 
 	// Query ledger with context
 	payload, err := invoker.Query(ctx, req.ChaincodeName, req.FunctionName, req.Args)

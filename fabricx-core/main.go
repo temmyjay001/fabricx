@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/temmyjay001/fabricx-core/pkg/docker"
+	"github.com/temmyjay001/fabricx-core/pkg/executor"
 	"github.com/temmyjay001/fabricx-core/pkg/grpcserver"
 	"google.golang.org/grpc"
 )
@@ -33,7 +34,8 @@ func main() {
 	}
 
 	// Ensure Docker is available
-	if err := checkDockerAvailable(); err != nil {
+	dockerManager := docker.NewManager(executor.NewRealExecutor())
+	if err := checkDockerAvailable(dockerManager); err != nil {
 		log.Fatalf("Docker is not available: %v\nPlease ensure Docker is installed and running.", err)
 	}
 
@@ -44,7 +46,7 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	fabricxServer := grpcserver.NewFabricXServer()
+	fabricxServer := grpcserver.NewFabricXServer(dockerManager)
 	grpcserver.RegisterFabricXServiceServer(grpcServer, fabricxServer)
 
 	log.Printf("🚀 FabricX Runtime v%s starting on port %s", version, *port)
@@ -65,7 +67,6 @@ func main() {
 	}
 }
 
-func checkDockerAvailable() error {
-	dockerManager := docker.NewManager()
+func checkDockerAvailable(dockerManager *docker.Manager) error {
 	return dockerManager.CheckDockerAvailable(context.Background())
 }

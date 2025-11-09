@@ -32,11 +32,7 @@ type DeployRequest struct {
 	EndorsementPolicyOrgs []string
 }
 
-func NewDeployer(net *network.Network, dockerMgr *docker.Manager) *Deployer {
-	return NewDeployerWithExecutor(net, dockerMgr, executor.NewRealExecutor())
-}
-
-func NewDeployerWithExecutor(net *network.Network, dockerMgr *docker.Manager, exec executor.Executor) *Deployer {
+func NewDeployer(net *network.Network, dockerMgr *docker.Manager, exec executor.Executor) *Deployer {
 	return &Deployer{
 		network:   net,
 		dockerMgr: dockerMgr,

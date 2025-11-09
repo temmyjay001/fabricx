@@ -31,7 +31,7 @@ func TestFullLifecycle(t *testing.T) {
 		ChannelName: "testchannel",
 	}
 
-	net, err := network.BootstrapWithContext(ctx, config)
+	net, err := network.Bootstrap(ctx, config, executor.NewRealExecutor())
 	if err != nil {
 		t.Fatalf("Failed to bootstrap network: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestFullLifecycle(t *testing.T) {
 
 	// Step 2: Start Docker containers
 	t.Log("Step 2: Starting Docker containers...")
-	dockerMgr := docker.NewManager()
+	dockerMgr := docker.NewManager(executor.NewRealExecutor())
 
 	if err := dockerMgr.StartNetwork(ctx, net); err != nil {
 		t.Fatalf("Failed to start network: %v", err)
@@ -109,7 +109,7 @@ func TestMockFullLifecycle(t *testing.T) {
 		ChannelName: "testchannel",
 	}
 
-	net, err := network.BootstrapWithExecutor(ctx, config, mockExec)
+	net, err := network.Bootstrap(ctx, config, mockExec)
 	if err != nil {
 		t.Fatalf("Failed to bootstrap network: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestMockFullLifecycle(t *testing.T) {
 
 	// Step 2: Start containers (mocked)
 	t.Log("Step 2: Starting containers (mocked)...")
-	dockerMgr := docker.NewManagerWithExecutor(mockExec)
+	dockerMgr := docker.NewManager(mockExec)
 
 	if err := dockerMgr.StartNetwork(ctx, net); err != nil {
 		t.Fatalf("Failed to start network: %v", err)
@@ -133,7 +133,7 @@ func TestMockFullLifecycle(t *testing.T) {
 
 	// Step 3: Deploy chaincode (mocked)
 	t.Log("Step 3: Deploying chaincode (mocked)...")
-	deployer := chaincode.NewDeployerWithExecutor(net, dockerMgr, mockExec)
+	deployer := chaincode.NewDeployer(net, dockerMgr, mockExec)
 
 	req := &chaincode.DeployRequest{
 		Name:     "testcc",
@@ -155,7 +155,7 @@ func TestMockFullLifecycle(t *testing.T) {
 
 	// Step 4: Invoke transaction (mocked)
 	t.Log("Step 4: Invoking transaction (mocked)...")
-	invoker := chaincode.NewInvokerWithExecutor(net, mockExec)
+	invoker := chaincode.NewInvoker(net, mockExec)
 
 	// Mock transaction response
 	mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
@@ -230,7 +230,7 @@ func TestLifecycleWithErrors(t *testing.T) {
 			ChannelName: "testchannel",
 		}
 
-		_, err := network.BootstrapWithExecutor(ctx, config, mockExec)
+		_, err := network.Bootstrap(ctx, config, mockExec)
 		if err == nil {
 			t.Error("Expected error during bootstrap")
 		}
@@ -255,13 +255,13 @@ func TestLifecycleWithErrors(t *testing.T) {
 			ChannelName: "testchannel",
 		}
 
-		net, err := network.BootstrapWithExecutor(ctx, config, mockExec)
+		net, err := network.Bootstrap(ctx, config, mockExec)
 		if err != nil {
 			t.Fatalf("Bootstrap failed: %v", err)
 		}
 		defer net.Cleanup()
 
-		dockerMgr := docker.NewManagerWithExecutor(mockExec)
+		dockerMgr := docker.NewManager(mockExec)
 		err = dockerMgr.StartNetwork(ctx, net)
 		if err == nil {
 			t.Error("Expected error starting network")
@@ -284,14 +284,14 @@ func TestLifecycleWithErrors(t *testing.T) {
 			ChannelName: "testchannel",
 		}
 
-		net, err := network.BootstrapWithExecutor(ctx, config, mockExec)
+		net, err := network.Bootstrap(ctx, config, mockExec)
 		if err != nil {
 			t.Fatalf("Bootstrap failed: %v", err)
 		}
 		defer net.Cleanup()
 
-		dockerMgr := docker.NewManagerWithExecutor(mockExec)
-		deployer := chaincode.NewDeployerWithExecutor(net, dockerMgr, mockExec)
+		dockerMgr := docker.NewManager(mockExec)
+		deployer := chaincode.NewDeployer(net, dockerMgr, mockExec)
 
 		req := &chaincode.DeployRequest{
 			Name:    "testcc",
@@ -329,7 +329,7 @@ func TestLifecycleContextCancellation(t *testing.T) {
 			ChannelName: "testchannel",
 		}
 
-		_, err := network.BootstrapWithExecutor(ctx, config, mockExec)
+		_, err := network.Bootstrap(ctx, config, mockExec)
 		if err == nil {
 			t.Error("Expected error due to context cancellation")
 		}
@@ -363,7 +363,7 @@ func TestLifecycleContextCancellation(t *testing.T) {
 			ChannelName: "testchannel",
 		}
 
-		net, err := network.BootstrapWithExecutor(bootstrapCtx, config, mockExec)
+		net, err := network.Bootstrap(bootstrapCtx, config, mockExec)
 		if err != nil {
 			t.Fatalf("Bootstrap failed: %v", err)
 		}
@@ -373,8 +373,8 @@ func TestLifecycleContextCancellation(t *testing.T) {
 		deployCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
-		dockerMgr := docker.NewManagerWithExecutor(mockExec)
-		deployer := chaincode.NewDeployerWithExecutor(net, dockerMgr, mockExec)
+		dockerMgr := docker.NewManager(mockExec)
+		deployer := chaincode.NewDeployer(net, dockerMgr, mockExec)
 
 		req := &chaincode.DeployRequest{
 			Name:    "testcc",
@@ -410,17 +410,17 @@ func BenchmarkFullLifecycle(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Bootstrap
-		net, err := network.BootstrapWithExecutor(ctx, config, mockExec)
+		net, err := network.Bootstrap(ctx, config, mockExec)
 		if err != nil {
 			b.Fatal(err)
 		}
 
 		// Start network
-		dockerMgr := docker.NewManagerWithExecutor(mockExec)
+		dockerMgr := docker.NewManager(mockExec)
 		dockerMgr.StartNetwork(ctx, net)
 
 		// Deploy chaincode
-		deployer := chaincode.NewDeployerWithExecutor(net, dockerMgr, mockExec)
+		deployer := chaincode.NewDeployer(net, dockerMgr, mockExec)
 		req := &chaincode.DeployRequest{
 			Name:    "testcc",
 			Path:    "/chaincode/testcc",
