@@ -1,10 +1,9 @@
-export default {
-  preset: 'ts-jest',
+module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/sdk/src', '<rootDir>/cli/src'],
   testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': 'babel-jest',
   },
   collectCoverageFrom: [
     'packages/**/*.ts',
