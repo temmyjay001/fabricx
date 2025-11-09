@@ -1,0 +1,12 @@
+# Source files
+src/
+
+# Configuration
+tsconfig.json
+.eslintrc.json
+.prettierrc.json
+
+# Development
+.git/
+.gitignore
+node_modules/
