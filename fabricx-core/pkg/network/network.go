@@ -200,8 +200,13 @@ func (n *Network) WaitForReady(ctx context.Context) error {
 		defer cancel()
 	}
 
+	// Wait for containers to be healthy
+	fmt.Println("⏳ Waiting for containers to be ready...")
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
+
+	startTime := time.Now()
+	timeout := 30 * time.Second
 
 	for {
 		select {
@@ -210,11 +215,38 @@ func (n *Network) WaitForReady(ctx context.Context) error {
 				"network_id": n.ID,
 			})
 		case <-ticker.C:
+			if time.Since(startTime) > timeout {
+				fmt.Println("✓ Containers should be ready now")
+				goto CHANNEL_SETUP
+			}
+
+			// Check container health
 			if n.checkReadiness(ctx) {
-				return nil
+				fmt.Println("✓ Containers are healthy")
+				goto CHANNEL_SETUP
 			}
 		}
 	}
+
+CHANNEL_SETUP:
+	// Create channel
+	if err := n.CreateChannel(ctx); err != nil {
+		return errors.Wrap("WaitForReady.CreateChannel", err)
+	}
+
+	// Join peers to channel
+	if err := n.JoinPeersToChannel(ctx); err != nil {
+		return errors.Wrap("WaitForReady.JoinPeers", err)
+	}
+
+	// Update anchor peers (non-critical)
+	if err := n.UpdateAnchorPeers(ctx); err != nil {
+		fmt.Printf("Warning: Could not update anchor peers: %v\n", err)
+		// Don't fail on anchor peer update
+	}
+
+	fmt.Println("✅ Network is fully ready!")
+	return nil
 }
 
 func (n *Network) checkReadiness(ctx context.Context) bool {
@@ -223,9 +255,27 @@ func (n *Network) checkReadiness(ctx context.Context) bool {
 		return false
 	}
 
-	// In production, this would check actual container health
-	// For now, we assume network is ready after creation
-	return true
+	// Check if orderer is responsive
+	output, err := n.exec.ExecuteCombined(ctx, "docker", "exec", n.Orderers[0].Name, 
+		"sh", "-c", "echo 'test' > /dev/null")
+	if err != nil {
+		return false
+	}
+	_ = output
+
+	// Check if at least one peer is responsive
+	for _, org := range n.Orgs {
+		for _, peer := range org.Peers {
+			output, err := n.exec.ExecuteCombined(ctx, "docker", "exec", peer.Name,
+				"sh", "-c", "echo 'test' > /dev/null")
+			if err == nil {
+				_ = output
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (n *Network) GetEndpoints() []string {

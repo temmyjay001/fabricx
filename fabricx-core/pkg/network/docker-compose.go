@@ -219,6 +219,20 @@ func generateCLIService(net *Network) map[string]interface{} {
 	// Use first org for CLI
 	org := net.Orgs[0]
 
+	// Build volume mounts for all orgs
+	volumes := []string{
+		"/var/run/docker.sock:/host/var/run/docker.sock",
+		fmt.Sprintf("%s:/etc/hyperledger/fabric/config", net.ConfigPath),
+		fmt.Sprintf("%s:/etc/hyperledger/fabric/crypto", net.CryptoPath),
+	}
+
+	// Mount all org MSPs so CLI can switch between orgs
+	for _, o := range net.Orgs {
+		volumes = append(volumes, 
+			fmt.Sprintf("%s/peerOrganizations/%s/users:/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users", 
+				net.CryptoPath, o.Domain, o.Domain))
+	}
+
 	return map[string]interface{}{
 		"container_name": "cli",
 		"image":          "hyperledger/fabric-tools:2.5",
@@ -227,20 +241,16 @@ func generateCLIService(net *Network) map[string]interface{} {
 		"environment": []string{
 			"GOPATH=/opt/gopath",
 			"FABRIC_LOGGING_SPEC=INFO",
+			"FABRIC_CFG_PATH=/etc/hyperledger/fabric/config",
 			fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
 			fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", org.Peers[0].Name, org.Peers[0].Port),
-			fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/users/Admin@%s/msp", org.Domain),
+			fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
 			"CORE_PEER_TLS_ENABLED=false",
 		},
 		"working_dir": "/opt/gopath/src/github.com/hyperledger/fabric/peer",
 		"command":     "/bin/bash",
-		"volumes": []string{
-			"/var/run/docker.sock:/host/var/run/docker.sock",
-			fmt.Sprintf("%s:/etc/hyperledger/fabric/config", net.ConfigPath),
-			fmt.Sprintf("%s:/etc/hyperledger/fabric/crypto", net.CryptoPath),
-			// Mount all org MSPs for multi-org operations
-		},
-		"networks": []string{"fabricx"},
+		"volumes":     volumes,
+		"networks":    []string{"fabricx"},
 		"depends_on": func() []string {
 			deps := []string{}
 			for _, orderer := range net.Orderers {
