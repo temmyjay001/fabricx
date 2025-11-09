@@ -1,28 +1,40 @@
-// pkg/chaincode/invoker.go
+// fabricx-core/pkg/chaincode/invoker.go
 package chaincode
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strings"
 
+	"github.com/temmyjay001/fabricx-core/pkg/errors"
+	"github.com/temmyjay001/fabricx-core/pkg/executor"
 	"github.com/temmyjay001/fabricx-core/pkg/network"
 )
 
 type Invoker struct {
 	network *network.Network
+	exec    executor.Executor
 }
 
 func NewInvoker(net *network.Network) *Invoker {
+	return NewInvokerWithExecutor(net, executor.NewRealExecutor())
+}
+
+func NewInvokerWithExecutor(net *network.Network, exec executor.Executor) *Invoker {
 	return &Invoker{
 		network: net,
+		exec:    exec,
 	}
 }
 
 // Invoke executes a transaction inside a peer container (no local binaries)
 func (inv *Invoker) Invoke(ctx context.Context, chaincodeName, functionName string, args []string) (string, []byte, error) {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return "", nil, errors.Wrap("Invoke", err)
+	}
+
 	// Use first org for invocation
 	org := inv.network.Orgs[0]
 	peer := org.Peers[0]
@@ -53,10 +65,14 @@ func (inv *Invoker) Invoke(ctx context.Context, chaincodeName, functionName stri
 	)
 	cmdArgs = append(cmdArgs, peerAddresses...)
 
-	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
-	output, err := cmd.CombinedOutput()
+	output, err := inv.exec.ExecuteCombined(ctx, "docker", cmdArgs...)
 	if err != nil {
-		return "", nil, fmt.Errorf("invoke failed: %w\nOutput: %s", err, string(output))
+		return "", nil, errors.WrapWithContext("Invoke", errors.ErrTransactionFailed, map[string]interface{}{
+			"chaincode": chaincodeName,
+			"function":  functionName,
+			"error":     err.Error(),
+			"output":    string(output),
+		})
 	}
 
 	// Extract transaction ID from output
@@ -67,6 +83,11 @@ func (inv *Invoker) Invoke(ctx context.Context, chaincodeName, functionName stri
 
 // Query executes a read-only query inside a peer container
 func (inv *Invoker) Query(ctx context.Context, chaincodeName, functionName string, args []string) ([]byte, error) {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Wrap("Query", err)
+	}
+
 	// Use first org for query
 	org := inv.network.Orgs[0]
 	peer := org.Peers[0]
@@ -86,10 +107,14 @@ func (inv *Invoker) Query(ctx context.Context, chaincodeName, functionName strin
 		"-c", argsJSON,
 	)
 
-	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
-	output, err := cmd.CombinedOutput()
+	output, err := inv.exec.ExecuteCombined(ctx, "docker", cmdArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("query failed: %w\nOutput: %s", err, string(output))
+		return nil, errors.WrapWithContext("Query", err, map[string]interface{}{
+			"chaincode": chaincodeName,
+			"function":  functionName,
+			"error":     err.Error(),
+			"output":    string(output),
+		})
 	}
 
 	return output, nil
@@ -97,6 +122,11 @@ func (inv *Invoker) Query(ctx context.Context, chaincodeName, functionName strin
 
 // InvokeWithTransient executes a transaction with transient data
 func (inv *Invoker) InvokeWithTransient(ctx context.Context, chaincodeName, functionName string, args []string, transient map[string][]byte) (string, []byte, error) {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return "", nil, errors.Wrap("InvokeWithTransient", err)
+	}
+
 	org := inv.network.Orgs[0]
 	peer := org.Peers[0]
 	containerName := peer.Name
@@ -128,10 +158,14 @@ func (inv *Invoker) InvokeWithTransient(ctx context.Context, chaincodeName, func
 	)
 	cmdArgs = append(cmdArgs, peerAddresses...)
 
-	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
-	output, err := cmd.CombinedOutput()
+	output, err := inv.exec.ExecuteCombined(ctx, "docker", cmdArgs...)
 	if err != nil {
-		return "", nil, fmt.Errorf("invoke failed: %w\nOutput: %s", err, string(output))
+		return "", nil, errors.WrapWithContext("InvokeWithTransient", errors.ErrTransactionFailed, map[string]interface{}{
+			"chaincode": chaincodeName,
+			"function":  functionName,
+			"error":     err.Error(),
+			"output":    string(output),
+		})
 	}
 
 	txID := inv.extractTxID(string(output))
@@ -177,6 +211,11 @@ func (inv *Invoker) extractTxID(output string) string {
 
 // Helper to get block info
 func (inv *Invoker) GetBlockByNumber(ctx context.Context, blockNum uint64) ([]byte, error) {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Wrap("GetBlockByNumber", err)
+	}
+
 	org := inv.network.Orgs[0]
 	peer := org.Peers[0]
 	containerName := peer.Name
@@ -189,10 +228,13 @@ func (inv *Invoker) GetBlockByNumber(ctx context.Context, blockNum uint64) ([]by
 		"-c", inv.network.Channel.Name,
 	)
 
-	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
-	output, err := cmd.CombinedOutput()
+	output, err := inv.exec.ExecuteCombined(ctx, "docker", cmdArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("getinfo failed: %w\nOutput: %s", err, string(output))
+		return nil, errors.WrapWithContext("GetBlockByNumber", err, map[string]interface{}{
+			"block_num": blockNum,
+			"error":     err.Error(),
+			"output":    string(output),
+		})
 	}
 
 	return output, nil
@@ -200,6 +242,11 @@ func (inv *Invoker) GetBlockByNumber(ctx context.Context, blockNum uint64) ([]by
 
 // Helper to get transaction by ID
 func (inv *Invoker) GetTransactionByID(ctx context.Context, txID string) ([]byte, error) {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Wrap("GetTransactionByID", err)
+	}
+
 	org := inv.network.Orgs[0]
 	peer := org.Peers[0]
 	containerName := peer.Name
@@ -214,10 +261,13 @@ func (inv *Invoker) GetTransactionByID(ctx context.Context, txID string) ([]byte
 		"-c", fmt.Sprintf(`{"Args":["GetTransactionByID","%s","%s"]}`, inv.network.Channel.Name, txID),
 	)
 
-	cmd := exec.CommandContext(ctx, "docker", cmdArgs...)
-	output, err := cmd.CombinedOutput()
+	output, err := inv.exec.ExecuteCombined(ctx, "docker", cmdArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("GetTransactionByID failed: %w\nOutput: %s", err, string(output))
+		return nil, errors.WrapWithContext("GetTransactionByID", err, map[string]interface{}{
+			"tx_id":  txID,
+			"error":  err.Error(),
+			"output": string(output),
+		})
 	}
 
 	return output, nil

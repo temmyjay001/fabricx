@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -66,5 +67,5 @@ func main() {
 
 func checkDockerAvailable() error {
 	dockerManager := docker.NewManager()
-	return dockerManager.CheckDockerAvailable()
+	return dockerManager.CheckDockerAvailable(context.Background())
 }

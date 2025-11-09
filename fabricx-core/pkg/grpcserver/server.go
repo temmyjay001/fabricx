@@ -1,4 +1,4 @@
-// pkg/grpcserver/server.go
+// fabricx-core/pkg/grpcserver/server.go
 package grpcserver
 
 import (
@@ -9,6 +9,7 @@ import (
 
 	"github.com/temmyjay001/fabricx-core/pkg/chaincode"
 	"github.com/temmyjay001/fabricx-core/pkg/docker"
+	"github.com/temmyjay001/fabricx-core/pkg/errors"
 	"github.com/temmyjay001/fabricx-core/pkg/network"
 )
 
@@ -26,8 +27,24 @@ func NewFabricXServer() *FabricXServer {
 	}
 }
 
+// NewFabricXServerWithManager creates server with custom docker manager (for testing)
+func NewFabricXServerWithManager(mgr *docker.Manager) *FabricXServer {
+	return &FabricXServer{
+		networks:  make(map[string]*network.Network),
+		dockerMgr: mgr,
+	}
+}
+
 func (s *FabricXServer) InitNetwork(ctx context.Context, req *InitNetworkRequest) (*InitNetworkResponse, error) {
 	log.Printf("InitNetwork called: %s with %d orgs", req.NetworkName, req.NumOrgs)
+
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return &InitNetworkResponse{
+			Success: false,
+			Message: fmt.Sprintf("Context error: %v", err),
+		}, nil
+	}
 
 	// Create network configuration
 	config := &network.Config{
@@ -37,9 +54,15 @@ func (s *FabricXServer) InitNetwork(ctx context.Context, req *InitNetworkRequest
 		CustomConfig: req.Config,
 	}
 
-	// Bootstrap the network
-	net, err := network.Bootstrap(config)
+	// Bootstrap the network with context
+	net, err := network.BootstrapWithContext(ctx, config)
 	if err != nil {
+		if errors.IsTimeout(err) {
+			return &InitNetworkResponse{
+				Success: false,
+				Message: "Network bootstrap timed out",
+			}, nil
+		}
 		return &InitNetworkResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to bootstrap network: %v", err),
@@ -51,16 +74,27 @@ func (s *FabricXServer) InitNetwork(ctx context.Context, req *InitNetworkRequest
 	s.networks[net.ID] = net
 	s.networksMu.Unlock()
 
-	// Start Docker containers
-	if err := s.dockerMgr.StartNetwork(net); err != nil {
+	// Start Docker containers with context
+	if err := s.dockerMgr.StartNetwork(ctx, net); err != nil {
+		// Clean up network on failure
+		s.networksMu.Lock()
+		delete(s.networks, net.ID)
+		s.networksMu.Unlock()
+		
 		return &InitNetworkResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to start containers: %v", err),
 		}, nil
 	}
 
-	// Wait for network readiness
+	// Wait for network readiness with context
 	if err := net.WaitForReady(ctx); err != nil {
+		// Clean up on failure
+		s.dockerMgr.StopNetwork(ctx, net, true)
+		s.networksMu.Lock()
+		delete(s.networks, net.ID)
+		s.networksMu.Unlock()
+		
 		return &InitNetworkResponse{
 			Success: false,
 			Message: fmt.Sprintf("Network failed to become ready: %v", err),
@@ -80,6 +114,14 @@ func (s *FabricXServer) InitNetwork(ctx context.Context, req *InitNetworkRequest
 func (s *FabricXServer) DeployChaincode(ctx context.Context, req *DeployChaincodeRequest) (*DeployChaincodeResponse, error) {
 	log.Printf("DeployChaincode called: %s on network %s", req.ChaincodeName, req.NetworkId)
 
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return &DeployChaincodeResponse{
+			Success: false,
+			Message: fmt.Sprintf("Context error: %v", err),
+		}, nil
+	}
+
 	// Get network
 	s.networksMu.RLock()
 	net, exists := s.networks[req.NetworkId]
@@ -95,7 +137,7 @@ func (s *FabricXServer) DeployChaincode(ctx context.Context, req *DeployChaincod
 	// Create chaincode deployer
 	deployer := chaincode.NewDeployer(net, s.dockerMgr)
 
-	// Deploy chaincode
+	// Deploy chaincode with context
 	ccID, err := deployer.Deploy(ctx, &chaincode.DeployRequest{
 		Name:                  req.ChaincodeName,
 		Path:                  req.ChaincodePath,
@@ -105,6 +147,12 @@ func (s *FabricXServer) DeployChaincode(ctx context.Context, req *DeployChaincod
 	})
 
 	if err != nil {
+		if errors.IsTimeout(err) {
+			return &DeployChaincodeResponse{
+				Success: false,
+				Message: "Chaincode deployment timed out",
+			}, nil
+		}
 		return &DeployChaincodeResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to deploy chaincode: %v", err),
@@ -123,6 +171,14 @@ func (s *FabricXServer) DeployChaincode(ctx context.Context, req *DeployChaincod
 func (s *FabricXServer) InvokeTransaction(ctx context.Context, req *InvokeTransactionRequest) (*InvokeTransactionResponse, error) {
 	log.Printf("InvokeTransaction called: %s.%s on network %s", req.ChaincodeName, req.FunctionName, req.NetworkId)
 
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return &InvokeTransactionResponse{
+			Success: false,
+			Message: fmt.Sprintf("Context error: %v", err),
+		}, nil
+	}
+
 	// Get network
 	s.networksMu.RLock()
 	net, exists := s.networks[req.NetworkId]
@@ -138,9 +194,15 @@ func (s *FabricXServer) InvokeTransaction(ctx context.Context, req *InvokeTransa
 	// Create transaction invoker
 	invoker := chaincode.NewInvoker(net)
 
-	// Invoke transaction
+	// Invoke transaction with context
 	txID, payload, err := invoker.Invoke(ctx, req.ChaincodeName, req.FunctionName, req.Args)
 	if err != nil {
+		if errors.IsTimeout(err) {
+			return &InvokeTransactionResponse{
+				Success: false,
+				Message: "Transaction timed out",
+			}, nil
+		}
 		return &InvokeTransactionResponse{
 			Success: false,
 			Message: fmt.Sprintf("Transaction failed: %v", err),
@@ -160,6 +222,14 @@ func (s *FabricXServer) InvokeTransaction(ctx context.Context, req *InvokeTransa
 func (s *FabricXServer) QueryLedger(ctx context.Context, req *QueryLedgerRequest) (*QueryLedgerResponse, error) {
 	log.Printf("QueryLedger called: %s.%s on network %s", req.ChaincodeName, req.FunctionName, req.NetworkId)
 
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return &QueryLedgerResponse{
+			Success: false,
+			Message: fmt.Sprintf("Context error: %v", err),
+		}, nil
+	}
+
 	// Get network
 	s.networksMu.RLock()
 	net, exists := s.networks[req.NetworkId]
@@ -175,9 +245,15 @@ func (s *FabricXServer) QueryLedger(ctx context.Context, req *QueryLedgerRequest
 	// Create query executor
 	invoker := chaincode.NewInvoker(net)
 
-	// Query ledger
+	// Query ledger with context
 	payload, err := invoker.Query(ctx, req.ChaincodeName, req.FunctionName, req.Args)
 	if err != nil {
+		if errors.IsTimeout(err) {
+			return &QueryLedgerResponse{
+				Success: false,
+				Message: "Query timed out",
+			}, nil
+		}
 		return &QueryLedgerResponse{
 			Success: false,
 			Message: fmt.Sprintf("Query failed: %v", err),
@@ -196,6 +272,14 @@ func (s *FabricXServer) QueryLedger(ctx context.Context, req *QueryLedgerRequest
 func (s *FabricXServer) StopNetwork(ctx context.Context, req *StopNetworkRequest) (*StopNetworkResponse, error) {
 	log.Printf("StopNetwork called: %s (cleanup: %v)", req.NetworkId, req.Cleanup)
 
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return &StopNetworkResponse{
+			Success: false,
+			Message: fmt.Sprintf("Context error: %v", err),
+		}, nil
+	}
+
 	// Get network
 	s.networksMu.Lock()
 	net, exists := s.networks[req.NetworkId]
@@ -211,8 +295,8 @@ func (s *FabricXServer) StopNetwork(ctx context.Context, req *StopNetworkRequest
 		}, nil
 	}
 
-	// Stop Docker containers
-	if err := s.dockerMgr.StopNetwork(net, req.Cleanup); err != nil {
+	// Stop Docker containers with context
+	if err := s.dockerMgr.StopNetwork(ctx, net, req.Cleanup); err != nil {
 		return &StopNetworkResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to stop network: %v", err),
@@ -228,6 +312,14 @@ func (s *FabricXServer) StopNetwork(ctx context.Context, req *StopNetworkRequest
 }
 
 func (s *FabricXServer) GetNetworkStatus(ctx context.Context, req *NetworkStatusRequest) (*NetworkStatusResponse, error) {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return &NetworkStatusResponse{
+			Running: false,
+			Status:  fmt.Sprintf("context error: %v", err),
+		}, nil
+	}
+
 	// Get network
 	s.networksMu.RLock()
 	net, exists := s.networks[req.NetworkId]
@@ -240,8 +332,8 @@ func (s *FabricXServer) GetNetworkStatus(ctx context.Context, req *NetworkStatus
 		}, nil
 	}
 
-	// Get container status from docker manager
-	running, status, err := s.dockerMgr.GetNetworkStatus(net)
+	// Get container status from docker manager with context
+	running, status, err := s.dockerMgr.GetNetworkStatus(ctx, net)
 	if err != nil {
 		return &NetworkStatusResponse{
 			Running: false,
@@ -288,11 +380,14 @@ func (s *FabricXServer) StreamLogs(req *StreamLogsRequest, stream FabricXService
 	s.networksMu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("network %s not found", req.NetworkId)
+		return errors.WrapWithContext("StreamLogs", errors.ErrNetworkNotFound, map[string]interface{}{
+			"network_id": req.NetworkId,
+		})
 	}
 
-	// Get log channels from docker manager
-	logChan, errChan := s.dockerMgr.StreamLogs(stream.Context(), net, req.ContainerName)
+	// Get log channels from docker manager with stream context
+	ctx := stream.Context()
+	logChan, errChan := s.dockerMgr.StreamLogs(ctx, net, req.ContainerName)
 
 	// Forward logs to gRPC stream
 	for {
@@ -306,14 +401,36 @@ func (s *FabricXServer) StreamLogs(req *StreamLogsRequest, stream FabricXService
 				Container: req.ContainerName,
 				Message:   line,
 			}); err != nil {
-				return err
+				return errors.Wrap("StreamLogs.Send", err)
 			}
 		case err := <-errChan:
 			if err != nil {
-				return err
+				return errors.Wrap("StreamLogs", err)
 			}
-		case <-stream.Context().Done():
-			return stream.Context().Err()
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
+}
+
+// Shutdown gracefully shuts down the server
+func (s *FabricXServer) Shutdown(ctx context.Context) error {
+	log.Println("Shutting down FabricX server...")
+	
+	s.networksMu.Lock()
+	defer s.networksMu.Unlock()
+	
+	// Stop all running networks
+	for id, net := range s.networks {
+		log.Printf("Stopping network %s", id)
+		if err := s.dockerMgr.StopNetwork(ctx, net, false); err != nil {
+			log.Printf("Error stopping network %s: %v", id, err)
+		}
+	}
+	
+	s.networks = make(map[string]*network.Network)
+	log.Println("FabricX server shutdown complete")
+	
+	return nil
 }

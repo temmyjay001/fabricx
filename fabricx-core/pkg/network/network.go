@@ -1,4 +1,4 @@
-// pkg/network/network.go
+// fabricx-core/pkg/network/network.go
 package network
 
 import (
@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/temmyjay001/fabricx-core/pkg/errors"
+	"github.com/temmyjay001/fabricx-core/pkg/executor"
 )
 
 type Config struct {
@@ -28,6 +30,7 @@ type Network struct {
 	Channel    *Channel
 	CryptoPath string
 	ConfigPath string
+	exec       executor.Executor // For testing
 }
 
 type Organization struct {
@@ -57,7 +60,23 @@ type Channel struct {
 	ProfileName string
 }
 
+// Bootstrap creates a new network with real executor
 func Bootstrap(config *Config) (*Network, error) {
+	return BootstrapWithContext(context.Background(), config)
+}
+
+// BootstrapWithContext creates a network with context support
+func BootstrapWithContext(ctx context.Context, config *Config) (*Network, error) {
+	return BootstrapWithExecutor(ctx, config, executor.NewRealExecutor())
+}
+
+// BootstrapWithExecutor creates a network with custom executor (for testing)
+func BootstrapWithExecutor(ctx context.Context, config *Config, exec executor.Executor) (*Network, error) {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Wrap("Bootstrap", err)
+	}
+
 	// Generate network ID
 	netID := uuid.New().String()[:8]
 
@@ -76,7 +95,9 @@ func Bootstrap(config *Config) (*Network, error) {
 	basePath := filepath.Join(os.TempDir(), "fabricx", netID)
 	fmt.Printf("Creating network at %s\n", basePath)
 	if err := os.MkdirAll(basePath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create base directory: %w", err)
+		return nil, errors.WrapWithContext("Bootstrap.CreateDir", err, map[string]interface{}{
+			"base_path": basePath,
+		})
 	}
 
 	// Initialize network structure
@@ -91,6 +112,7 @@ func Bootstrap(config *Config) (*Network, error) {
 			Name:        config.ChannelName,
 			ProfileName: "FabricXChannel",
 		},
+		exec: exec,
 	}
 
 	// Generate organizations
@@ -99,29 +121,46 @@ func Bootstrap(config *Config) (*Network, error) {
 	// Generate orderers
 	net.Orderers = generateOrderers()
 
+	// Check context before long operations
+	if err := ctx.Err(); err != nil {
+		net.Cleanup()
+		return nil, errors.Wrap("Bootstrap", err)
+	}
+
 	// Generate crypto material
-	if err := generateCrypto(net); err != nil {
-		return nil, fmt.Errorf("failed to generate crypto: %w", err)
+	if err := generateCrypto(ctx, net); err != nil {
+		net.Cleanup()
+		return nil, errors.Wrap("Bootstrap.GenerateCrypto", err)
+	}
+
+	// Check context
+	if err := ctx.Err(); err != nil {
+		net.Cleanup()
+		return nil, errors.Wrap("Bootstrap", err)
 	}
 
 	// Generate configtx.yaml
 	if err := generateConfigTx(net); err != nil {
-		return nil, fmt.Errorf("failed to generate configtx: %w", err)
+		net.Cleanup()
+		return nil, errors.Wrap("Bootstrap.GenerateConfigTx", err)
 	}
 
 	// Generate genesis block
-	if err := generateGenesisBlock(net); err != nil {
-		return nil, fmt.Errorf("failed to generate genesis block: %w", err)
+	if err := generateGenesisBlock(ctx, net); err != nil {
+		net.Cleanup()
+		return nil, errors.Wrap("Bootstrap.GenerateGenesisBlock", err)
 	}
 
 	// Generate channel configuration
-	if err := generateChannelTx(net); err != nil {
-		return nil, fmt.Errorf("failed to generate channel tx: %w", err)
+	if err := generateChannelTx(ctx, net); err != nil {
+		net.Cleanup()
+		return nil, errors.Wrap("Bootstrap.GenerateChannelTx", err)
 	}
 
 	// Generate docker-compose
 	if err := generateDockerCompose(net); err != nil {
-		return nil, fmt.Errorf("failed to generate docker-compose: %w", err)
+		net.Cleanup()
+		return nil, errors.Wrap("Bootstrap.GenerateDockerCompose", err)
 	}
 
 	return net, nil
@@ -164,27 +203,38 @@ func generateOrderers() []*Orderer {
 }
 
 func (n *Network) WaitForReady(ctx context.Context) error {
-	timeout := time.After(120 * time.Second)
+	// Create a deadline context if not already set
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+		defer cancel()
+	}
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for network to be ready")
+		case <-ctx.Done():
+			return errors.WrapWithContext("WaitForReady", errors.ErrTimeout, map[string]interface{}{
+				"network_id": n.ID,
+			})
 		case <-ticker.C:
-			if n.checkReadiness() {
+			if n.checkReadiness(ctx) {
 				return nil
 			}
-		case <-ctx.Done():
-			return ctx.Err()
 		}
 	}
 }
 
-func (n *Network) checkReadiness() bool {
-	// Check if all containers are running (simplified)
+func (n *Network) checkReadiness(ctx context.Context) bool {
+	// Check if context is cancelled
+	if ctx.Err() != nil {
+		return false
+	}
+
 	// In production, this would check actual container health
+	// For now, we assume network is ready after creation
 	return true
 }
 
@@ -265,5 +315,18 @@ func (n *Network) GetConnectionProfile(orgName string) (map[string]interface{}, 
 }
 
 func (n *Network) Cleanup() error {
-	return os.RemoveAll(n.BasePath)
+	if err := os.RemoveAll(n.BasePath); err != nil {
+		return errors.WrapWithContext("Cleanup", err, map[string]interface{}{
+			"base_path": n.BasePath,
+		})
+	}
+	return nil
+}
+
+// Helper to get executor
+func (n *Network) GetExecutor() executor.Executor {
+	if n.exec == nil {
+		n.exec = executor.NewRealExecutor()
+	}
+	return n.exec
 }

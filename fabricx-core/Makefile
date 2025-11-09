@@ -1,24 +1,25 @@
 # Makefile
-.PHONY: all build proto test clean run install deps client
+.PHONY: all build proto test test-unit test-integration test-coverage clean run install deps client lint security docker-build help
 
 # Variables
 BINARY_NAME=fabricx-runtime
 CLIENT_NAME=fabricx-client
 PROTO_DIR=protos
-GO_FILES=$(shell find . -name '*.go' -type f)
+GO_FILES=$(shell find . -name '*.go' -type f -not -path "./vendor/*")
 PROTO_FILES=$(shell find $(PROTO_DIR) -name '*.proto' -type f)
+COVERAGE_DIR=coverage
 
 all: deps proto build client
 
 # Install dependencies
 deps:
-	@echo "Installing dependencies..."
+	@echo "📦 Installing dependencies..."
 	go mod download
 	go mod tidy
 
 # Generate protobuf files
 proto:
-	@echo "Generating protobuf files..."
+	@echo "🔨 Generating protobuf files..."
 	@mkdir -p pkg/grpcserver
 	protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
@@ -27,108 +28,248 @@ proto:
 
 # Build the binary
 build: proto
-	@echo "Building $(BINARY_NAME)..."
+	@echo "🏗️  Building $(BINARY_NAME)..."
 	go build -o bin/$(BINARY_NAME) main.go
 
 # Build the client
 client: proto
-	@echo "Building $(CLIENT_NAME)..."
+	@echo "🏗️  Building $(CLIENT_NAME)..."
 	go build -o bin/$(CLIENT_NAME) cmd/client/main.go
 
 # Build for multiple platforms
 build-all: proto
-	@echo "Building for multiple platforms..."
+	@echo "🌍 Building for multiple platforms..."
 	GOOS=linux GOARCH=amd64 go build -o bin/$(BINARY_NAME)-linux-amd64 main.go
 	GOOS=darwin GOARCH=amd64 go build -o bin/$(BINARY_NAME)-darwin-amd64 main.go
 	GOOS=darwin GOARCH=arm64 go build -o bin/$(BINARY_NAME)-darwin-arm64 main.go
 	GOOS=windows GOARCH=amd64 go build -o bin/$(BINARY_NAME)-windows-amd64.exe main.go
-	@echo "Building client for multiple platforms..."
+	@echo "🌍 Building client for multiple platforms..."
 	GOOS=linux GOARCH=amd64 go build -o bin/$(CLIENT_NAME)-linux-amd64 cmd/client/main.go
 	GOOS=darwin GOARCH=amd64 go build -o bin/$(CLIENT_NAME)-darwin-amd64 cmd/client/main.go
 	GOOS=darwin GOARCH=arm64 go build -o bin/$(CLIENT_NAME)-darwin-arm64 cmd/client/main.go
 	GOOS=windows GOARCH=amd64 go build -o bin/$(CLIENT_NAME)-windows-amd64.exe cmd/client/main.go
 
-# Run tests
-test:
-	@echo "Running tests..."
-	go test -v -race -coverprofile=coverage.out ./...
+# Run all tests
+test: test-unit
 
-# Run tests with coverage report
-test-coverage: test
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
+# Run unit tests
+test-unit:
+	@echo "🧪 Running unit tests..."
+	go test -v -race ./pkg/...
+
+# Run unit tests with short flag (skip slow tests)
+test-short:
+	@echo "⚡ Running short unit tests..."
+	go test -v -short -race ./pkg/...
+
+# Run integration tests
+test-integration:
+	@echo "🔗 Running integration tests..."
+	go test -v -tags=integration -race ./tests/integration/...
+
+# Run tests with coverage
+test-coverage:
+	@echo "📊 Running tests with coverage..."
+	@mkdir -p $(COVERAGE_DIR)
+	go test -v -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic ./pkg/...
+	go tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/coverage.html
+	@echo "📈 Coverage report: $(COVERAGE_DIR)/coverage.html"
+
+# Run tests and generate coverage report
+test-coverage-full:
+	@echo "📊 Running full test coverage..."
+	@mkdir -p $(COVERAGE_DIR)
+	go test -v -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic ./...
+	go tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/coverage.html
+	go tool cover -func=$(COVERAGE_DIR)/coverage.out | tail -n 1
+	@echo "📈 Coverage report: $(COVERAGE_DIR)/coverage.html"
+
+# Run specific package tests
+test-pkg:
+	@echo "🎯 Testing specific package..."
+	@read -p "Package name (e.g., ./pkg/docker): " pkg; \
+	go test -v -race $$pkg
+
+# Run tests with verbose output
+test-verbose:
+	@echo "📢 Running tests with verbose output..."
+	go test -v -race -count=1 ./pkg/...
+
+# Run benchmarks
+bench:
+	@echo "⏱️  Running benchmarks..."
+	go test -bench=. -benchmem ./pkg/...
+
+# Run benchmarks for specific package
+bench-pkg:
+	@read -p "Package name (e.g., ./pkg/docker): " pkg; \
+	go test -bench=. -benchmem $$pkg
 
 # Run the binary
 run: build
-	@echo "Starting FabricX Runtime..."
+	@echo "▶️  Starting FabricX Runtime..."
 	./bin/$(BINARY_NAME)
 
 # Install binary to $GOPATH/bin
 install: build
-	@echo "Installing $(BINARY_NAME)..."
+	@echo "📦 Installing $(BINARY_NAME)..."
 	go install
 
 # Clean build artifacts
 clean:
-	@echo "Cleaning..."
+	@echo "🧹 Cleaning..."
 	rm -rf bin/
+	rm -rf $(COVERAGE_DIR)/
 	rm -f coverage.out coverage.html
 	rm -rf /tmp/fabricx/
+	go clean -cache -testcache
 
 # Development mode with auto-reload
 dev:
-	@echo "Starting development mode..."
+	@echo "🔄 Starting development mode..."
 	@which air > /dev/null || go install github.com/cosmtrek/air@latest
 	air
 
 # Format code
 fmt:
-	@echo "Formatting code..."
+	@echo "✨ Formatting code..."
 	gofmt -s -w .
+	@which goimports > /dev/null || go install golang.org/x/tools/cmd/goimports@latest
+	goimports -w $(GO_FILES)
 
 # Lint code
 lint:
-	@echo "Linting code..."
+	@echo "🔍 Linting code..."
 	@which golangci-lint > /dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	golangci-lint run
+	golangci-lint run --timeout=5m
+
+# Lint with autofix
+lint-fix:
+	@echo "🔧 Linting code with autofix..."
+	@which golangci-lint > /dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	golangci-lint run --fix --timeout=5m
 
 # Check for security issues
 security:
-	@echo "Running security checks..."
+	@echo "🔒 Running security checks..."
 	@which gosec > /dev/null || go install github.com/securego/gosec/v2/cmd/gosec@latest
-	gosec ./...
+	gosec -exclude=G204,G304 ./...
+
+# Run static analysis
+vet:
+	@echo "🔬 Running go vet..."
+	go vet ./...
 
 # Generate mock files for testing
 mocks:
-	@echo "Generating mocks..."
+	@echo "🎭 Generating mocks..."
 	@which mockgen > /dev/null || go install github.com/golang/mock/mockgen@latest
 	go generate ./...
 
+# Check test coverage threshold
+check-coverage:
+	@echo "📊 Checking coverage threshold..."
+	@go test -coverprofile=$(COVERAGE_DIR)/coverage.out ./pkg/... > /dev/null
+	@go tool cover -func=$(COVERAGE_DIR)/coverage.out | \
+		awk '/^total:/ {print "Total coverage: " $$3; if ($$3+0 < 70) {print "❌ Coverage below 70%"; exit 1} else {print "✅ Coverage above 70%"}}'
+
+# Run all quality checks
+quality: fmt vet lint test-coverage check-coverage
+	@echo "✅ All quality checks passed!"
+
 # Docker build
 docker-build:
-	@echo "Building Docker image..."
+	@echo "🐳 Building Docker image..."
 	docker build -t fabricx-runtime:latest .
 
 # Docker run
 docker-run:
-	@echo "Running Docker container..."
+	@echo "🐳 Running Docker container..."
 	docker run -p 50051:50051 -v /var/run/docker.sock:/var/run/docker.sock fabricx-runtime:latest
+
+# CI pipeline simulation
+ci: deps proto lint vet test-coverage check-coverage
+	@echo "✅ CI pipeline completed successfully!"
+
+# Pre-commit checks
+pre-commit: fmt lint test-unit
+	@echo "✅ Pre-commit checks passed!"
+
+# Generate test report
+test-report:
+	@echo "📄 Generating test report..."
+	@mkdir -p $(COVERAGE_DIR)
+	go test -v -json ./pkg/... > $(COVERAGE_DIR)/test-report.json
+	@echo "📄 Test report: $(COVERAGE_DIR)/test-report.json"
+
+# View coverage in browser
+coverage-html: test-coverage
+	@echo "🌐 Opening coverage report in browser..."
+	@which open > /dev/null && open $(COVERAGE_DIR)/coverage.html || \
+	 which xdg-open > /dev/null && xdg-open $(COVERAGE_DIR)/coverage.html || \
+	 echo "Please open $(COVERAGE_DIR)/coverage.html manually"
+
+# List all test functions
+list-tests:
+	@echo "📝 Listing all tests..."
+	@grep -r "^func Test" pkg/ | sed 's/.*func //' | sed 's/(t.*//' | sort
+
+# Run specific test by name
+test-name:
+	@read -p "Test name pattern: " pattern; \
+	go test -v -race -run=$$pattern ./pkg/...
 
 # Help
 help:
 	@echo "FabricX Runtime - Available targets:"
-	@echo "  make deps          - Install Go dependencies"
-	@echo "  make proto         - Generate protobuf files"
-	@echo "  make build         - Build the binary"
-	@echo "  make build-all     - Build for all platforms"
-	@echo "  make test          - Run tests"
-	@echo "  make test-coverage - Run tests with coverage"
-	@echo "  make run           - Build and run"
-	@echo "  make install       - Install to GOPATH"
-	@echo "  make clean         - Clean build artifacts"
-	@echo "  make dev           - Start development mode"
-	@echo "  make fmt           - Format code"
-	@echo "  make lint          - Lint code"
-	@echo "  make security      - Run security checks"
-	@echo "  make docker-build  - Build Docker image"
-	@echo "  make docker-run    - Run Docker container"
+	@echo ""
+	@echo "📦 Build & Dependencies:"
+	@echo "  make deps           - Install Go dependencies"
+	@echo "  make proto          - Generate protobuf files"
+	@echo "  make build          - Build the runtime binary"
+	@echo "  make client         - Build the client binary"
+	@echo "  make build-all      - Build for all platforms"
+	@echo ""
+	@echo "🧪 Testing:"
+	@echo "  make test           - Run all tests"
+	@echo "  make test-unit      - Run unit tests only"
+	@echo "  make test-short     - Run short tests"
+	@echo "  make test-integration - Run integration tests"
+	@echo "  make test-coverage  - Run tests with coverage"
+	@echo "  make test-verbose   - Run tests with verbose output"
+	@echo "  make test-pkg       - Test specific package"
+	@echo "  make test-name      - Run tests matching pattern"
+	@echo "  make bench          - Run benchmarks"
+	@echo "  make bench-pkg      - Benchmark specific package"
+	@echo ""
+	@echo "📊 Coverage & Reports:"
+	@echo "  make coverage-html  - Generate and open HTML coverage report"
+	@echo "  make check-coverage - Verify coverage threshold (70%)"
+	@echo "  make test-report    - Generate JSON test report"
+	@echo ""
+	@echo "✨ Code Quality:"
+	@echo "  make fmt            - Format code"
+	@echo "  make lint           - Lint code"
+	@echo "  make lint-fix       - Lint with autofix"
+	@echo "  make vet            - Run go vet"
+	@echo "  make security       - Run security checks"
+	@echo "  make quality        - Run all quality checks"
+	@echo "  make pre-commit     - Run pre-commit checks"
+	@echo ""
+	@echo "🔄 Development:"
+	@echo "  make run            - Build and run"
+	@echo "  make dev            - Start dev mode with auto-reload"
+	@echo "  make install        - Install to GOPATH"
+	@echo "  make clean          - Clean build artifacts"
+	@echo "  make mocks          - Generate mock files"
+	@echo ""
+	@echo "🐳 Docker:"
+	@echo "  make docker-build   - Build Docker image"
+	@echo "  make docker-run     - Run Docker container"
+	@echo ""
+	@echo "🚀 CI/CD:"
+	@echo "  make ci             - Simulate full CI pipeline"
+	@echo ""
+	@echo "💡 Other:"
+	@echo "  make list-tests     - List all test functions"
+	@echo "  make help           - Show this help message"

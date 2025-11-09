@@ -1,21 +1,22 @@
-// pkg/docker/manager.go
+// fabricx-core/pkg/docker/manager.go
 package docker
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/temmyjay001/fabricx-core/pkg/errors"
+	"github.com/temmyjay001/fabricx-core/pkg/executor"
 	"github.com/temmyjay001/fabricx-core/pkg/types"
 )
 
 type Manager struct {
 	mu       sync.Mutex
 	networks map[string]*NetworkState
+	exec     executor.Executor // Injected executor for testability
 }
 
 type NetworkState struct {
@@ -24,29 +25,41 @@ type NetworkState struct {
 	Running     bool
 }
 
+// NewManager creates a new Docker manager
 func NewManager() *Manager {
+	return NewManagerWithExecutor(executor.NewRealExecutor())
+}
+
+// NewManagerWithExecutor creates a manager with custom executor (for testing)
+func NewManagerWithExecutor(exec executor.Executor) *Manager {
 	return &Manager{
 		networks: make(map[string]*NetworkState),
+		exec:     exec,
 	}
 }
 
 // CheckDockerAvailable verifies Docker is installed and running
-func (m *Manager) CheckDockerAvailable() error {
-	cmd := exec.Command("docker", "version")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker is not available: %w", err)
+func (m *Manager) CheckDockerAvailable(ctx context.Context) error {
+	_, err := m.exec.ExecuteCombined(ctx, "docker", "version")
+	if err != nil {
+		return errors.WrapWithContext("CheckDockerAvailable", errors.ErrDockerUnavailable, map[string]interface{}{
+			"error": err.Error(),
+		})
 	}
 
-	cmd = exec.Command("docker-compose", "version")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker-compose is not available: %w", err)
+	_, err = m.exec.ExecuteCombined(ctx, "docker-compose", "version")
+	if err != nil {
+		return errors.WrapWithContext("CheckDockerAvailable", errors.ErrBinaryMissing, map[string]interface{}{
+			"binary": "docker-compose",
+			"error":  err.Error(),
+		})
 	}
 
 	return nil
 }
 
 // PullFabricImages pulls required Hyperledger Fabric Docker images
-func (m *Manager) PullFabricImages() error {
+func (m *Manager) PullFabricImages(ctx context.Context) error {
 	images := []string{
 		"hyperledger/fabric-peer:2.5",
 		"hyperledger/fabric-orderer:2.5",
@@ -57,9 +70,13 @@ func (m *Manager) PullFabricImages() error {
 
 	for _, image := range images {
 		fmt.Printf("📦 Pulling %s...\n", image)
-		cmd := exec.Command("docker", "pull", image)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to pull %s: %w", image, err)
+
+		_, err := m.exec.ExecuteCombined(ctx, "docker", "pull", image)
+		if err != nil {
+			return errors.WrapWithContext("PullFabricImages", errors.ErrContainerFailed, map[string]interface{}{
+				"image": image,
+				"error": err.Error(),
+			})
 		}
 	}
 
@@ -68,23 +85,27 @@ func (m *Manager) PullFabricImages() error {
 }
 
 // StartNetwork starts all containers for a network
-func (m *Manager) StartNetwork(net types.Network) error {
+func (m *Manager) StartNetwork(ctx context.Context, net types.Network) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	composePath := filepath.Join(net.GetConfigPath(), "docker-compose.yaml")
 	projectName := fmt.Sprintf("fabricx-%s", net.GetID())
 
-	// Start containers
 	fmt.Println("🚀 Starting Fabric network containers...")
-	cmd := exec.Command("docker-compose",
+
+	output, err := m.exec.ExecuteCombined(ctx, "docker-compose",
 		"-f", composePath,
 		"-p", projectName,
 		"up", "-d",
 	)
-	output, err := cmd.CombinedOutput()
+
 	if err != nil {
-		return fmt.Errorf("failed to start network: %w\nOutput: %s", err, string(output))
+		return errors.WrapWithContext("StartNetwork", errors.ErrContainerFailed, map[string]interface{}{
+			"network_id": net.GetID(),
+			"error":      err.Error(),
+			"output":     string(output),
+		})
 	}
 
 	m.networks[net.GetID()] = &NetworkState{
@@ -98,26 +119,31 @@ func (m *Manager) StartNetwork(net types.Network) error {
 }
 
 // StopNetwork stops and optionally removes containers
-func (m *Manager) StopNetwork(net types.Network, cleanup bool) error {
+func (m *Manager) StopNetwork(ctx context.Context, net types.Network, cleanup bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	state, exists := m.networks[net.GetID()]
 	if !exists {
-		return fmt.Errorf("network %s not found in manager", net.GetID())
+		return errors.WrapWithContext("StopNetwork", errors.ErrNetworkNotFound, map[string]interface{}{
+			"network_id": net.GetID(),
+		})
 	}
 
-	// Stop containers
 	fmt.Println("🛑 Stopping Fabric network...")
+
 	args := []string{"-f", state.ComposePath, "-p", state.ProjectName, "down"}
 	if cleanup {
 		args = append(args, "-v", "--remove-orphans")
 	}
 
-	cmd := exec.Command("docker-compose", args...)
-	output, err := cmd.CombinedOutput()
+	output, err := m.exec.ExecuteCombined(ctx, "docker-compose", args...)
 	if err != nil {
-		return fmt.Errorf("failed to stop network: %w\nOutput: %s", err, string(output))
+		return errors.WrapWithContext("StopNetwork", errors.ErrContainerFailed, map[string]interface{}{
+			"network_id": net.GetID(),
+			"error":      err.Error(),
+			"output":     string(output),
+		})
 	}
 
 	delete(m.networks, net.GetID())
@@ -125,7 +151,9 @@ func (m *Manager) StopNetwork(net types.Network, cleanup bool) error {
 	// Cleanup network directory if requested
 	if cleanup {
 		fmt.Println("🧹 Cleaning up network files...")
-		return net.Cleanup()
+		if err := net.Cleanup(); err != nil {
+			return errors.Wrap("StopNetwork.Cleanup", err)
+		}
 	}
 
 	fmt.Println("✅ Network stopped successfully")
@@ -133,7 +161,7 @@ func (m *Manager) StopNetwork(net types.Network, cleanup bool) error {
 }
 
 // GetNetworkStatus returns the status of all containers
-func (m *Manager) GetNetworkStatus(net types.Network) (bool, string, error) {
+func (m *Manager) GetNetworkStatus(ctx context.Context, net types.Network) (bool, string, error) {
 	m.mu.Lock()
 	state, exists := m.networks[net.GetID()]
 	m.mu.Unlock()
@@ -142,13 +170,12 @@ func (m *Manager) GetNetworkStatus(net types.Network) (bool, string, error) {
 		return false, "not started", nil
 	}
 
-	// Check container status
-	cmd := exec.Command("docker-compose",
+	output, err := m.exec.ExecuteCombined(ctx, "docker-compose",
 		"-f", state.ComposePath,
 		"-p", state.ProjectName,
 		"ps", "-q",
 	)
-	output, err := cmd.CombinedOutput()
+
 	if err != nil {
 		return false, fmt.Sprintf("error checking status: %v", err), nil
 	}
@@ -165,7 +192,6 @@ func (m *Manager) GetNetworkStatus(net types.Network) (bool, string, error) {
 }
 
 // StreamLogs streams container logs in real-time
-// Returns a channel that sends log lines
 func (m *Manager) StreamLogs(ctx context.Context, net types.Network, containerName string) (<-chan string, <-chan error) {
 	logChan := make(chan string, 100)
 	errChan := make(chan error, 1)
@@ -179,39 +205,42 @@ func (m *Manager) StreamLogs(ctx context.Context, net types.Network, containerNa
 		m.mu.Unlock()
 
 		if !exists {
-			errChan <- fmt.Errorf("network %s not found", net.GetID())
+			errChan <- errors.WrapWithContext("StreamLogs", errors.ErrNetworkNotFound, map[string]interface{}{
+				"network_id": net.GetID(),
+			})
 			return
 		}
 
-		// Stream logs from specific container
 		args := []string{"-f", state.ComposePath, "-p", state.ProjectName, "logs", "-f"}
 		if containerName != "" {
 			args = append(args, containerName)
 		}
 
-		cmd := exec.CommandContext(ctx, "docker-compose", args...)
-		stdout, err := cmd.StdoutPipe()
+		outChan, streamErrChan, err := m.exec.ExecuteStream(ctx, "docker-compose", args...)
 		if err != nil {
-			errChan <- err
+			errChan <- errors.Wrap("StreamLogs", err)
 			return
 		}
 
-		if err := cmd.Start(); err != nil {
-			errChan <- err
-			return
-		}
-
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
+		for {
 			select {
+			case line, ok := <-outChan:
+				if !ok {
+					return
+				}
+				select {
+				case logChan <- line:
+				case <-ctx.Done():
+					return
+				}
+			case err := <-streamErrChan:
+				if err != nil {
+					errChan <- errors.Wrap("StreamLogs", err)
+				}
+				return
 			case <-ctx.Done():
 				return
-			case logChan <- scanner.Text():
 			}
-		}
-
-		if err := cmd.Wait(); err != nil {
-			errChan <- err
 		}
 	}()
 
@@ -219,30 +248,47 @@ func (m *Manager) StreamLogs(ctx context.Context, net types.Network, containerNa
 }
 
 // ExecuteInContainer executes a command inside a running container
-func (m *Manager) ExecuteInContainer(containerName string, command []string) ([]byte, error) {
+func (m *Manager) ExecuteInContainer(ctx context.Context, containerName string, command []string) ([]byte, error) {
 	args := []string{"exec", containerName}
 	args = append(args, command...)
 
-	cmd := exec.Command("docker", args...)
-	return cmd.CombinedOutput()
+	output, err := m.exec.ExecuteCombined(ctx, "docker", args...)
+	if err != nil {
+		return output, errors.WrapWithContext("ExecuteInContainer", errors.ErrContainerFailed, map[string]interface{}{
+			"container": containerName,
+			"command":   command,
+			"error":     err.Error(),
+			"output":    string(output),
+		})
+	}
+
+	return output, nil
 }
 
 // CopyToContainer copies a file to a container
-func (m *Manager) CopyToContainer(srcPath, containerName, dstPath string) error {
-	cmd := exec.Command("docker", "cp", srcPath, fmt.Sprintf("%s:%s", containerName, dstPath))
-	output, err := cmd.CombinedOutput()
+func (m *Manager) CopyToContainer(ctx context.Context, srcPath, containerName, dstPath string) error {
+	_, err := m.exec.ExecuteCombined(ctx, "docker", "cp", srcPath, fmt.Sprintf("%s:%s", containerName, dstPath))
 	if err != nil {
-		return fmt.Errorf("failed to copy file: %w\nOutput: %s", err, string(output))
+		return errors.WrapWithContext("CopyToContainer", errors.ErrContainerFailed, map[string]interface{}{
+			"src":       srcPath,
+			"container": containerName,
+			"dst":       dstPath,
+			"error":     err.Error(),
+		})
 	}
 	return nil
 }
 
 // CopyFromContainer copies a file from a container
-func (m *Manager) CopyFromContainer(containerName, srcPath, dstPath string) error {
-	cmd := exec.Command("docker", "cp", fmt.Sprintf("%s:%s", containerName, srcPath), dstPath)
-	output, err := cmd.CombinedOutput()
+func (m *Manager) CopyFromContainer(ctx context.Context, containerName, srcPath, dstPath string) error {
+	_, err := m.exec.ExecuteCombined(ctx, "docker", "cp", fmt.Sprintf("%s:%s", containerName, srcPath), dstPath)
 	if err != nil {
-		return fmt.Errorf("failed to copy file: %w\nOutput: %s", err, string(output))
+		return errors.WrapWithContext("CopyFromContainer", errors.ErrContainerFailed, map[string]interface{}{
+			"container": containerName,
+			"src":       srcPath,
+			"dst":       dstPath,
+			"error":     err.Error(),
+		})
 	}
 	return nil
 }

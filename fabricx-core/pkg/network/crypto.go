@@ -1,11 +1,12 @@
-// pkg/network/crypto.go
+// fabricx-core/pkg/network/crypto.go
 package network
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 
+	"github.com/temmyjay001/fabricx-core/pkg/errors"
 	"github.com/temmyjay001/fabricx-core/pkg/utils"
 )
 
@@ -14,20 +15,26 @@ const (
 )
 
 // generateCrypto uses Docker to run cryptogen (no local binaries needed)
-func generateCrypto(net *Network) error {
+func generateCrypto(ctx context.Context, net *Network) error {
 	// Generate crypto-config.yaml
 	cryptoConfigPath := filepath.Join(net.ConfigPath, "crypto-config.yaml")
 	if err := utils.EnsureDir(filepath.Dir(cryptoConfigPath)); err != nil {
-		return err
+		return errors.Wrap("generateCrypto.EnsureDir", err)
 	}
 
 	cryptoConfig := generateCryptoConfig(net)
 	if err := utils.WriteYAML(cryptoConfigPath, cryptoConfig); err != nil {
-		return err
+		return errors.Wrap("generateCrypto.WriteYAML", err)
+	}
+
+	// Check context before long operation
+	if err := ctx.Err(); err != nil {
+		return errors.Wrap("generateCrypto", err)
 	}
 
 	// Run cryptogen inside Docker container
-	cmd := exec.Command("docker", "run", "--rm",
+	exec := net.GetExecutor()
+	output, err := exec.ExecuteCombined(ctx, "docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:/config", net.ConfigPath),
 		"-v", fmt.Sprintf("%s:/crypto-config", net.CryptoPath),
 		fabricToolsImage,
@@ -36,9 +43,11 @@ func generateCrypto(net *Network) error {
 		"--output=/crypto-config",
 	)
 
-	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("cryptogen failed: %w\nOutput: %s", err, string(output))
+		return errors.WrapWithContext("generateCrypto", errors.ErrCryptoGenFailed, map[string]interface{}{
+			"error":  err.Error(),
+			"output": string(output),
+		})
 	}
 
 	return nil
@@ -86,7 +95,7 @@ func generateConfigTx(net *Network) error {
 
 	configTx := generateConfigTxYAML(net)
 	if err := utils.WriteYAML(configTxPath, configTx); err != nil {
-		return err
+		return errors.Wrap("generateConfigTx", err)
 	}
 
 	return nil
@@ -247,13 +256,8 @@ func generateConfigTxYAML(net *Network) map[string]interface{} {
 		},
 	}
 
-	// Profiles - reference organizations by their &OrgName anchor
-	// In YAML, we'll use the actual organization struct reference
-	// The key insight: in the Profiles, we need to reference the SAME map objects
-	// that are in the Organizations array, not create new ones or use strings
-	
-	ordererOrg := organizations[0] // OrdererOrg
-	peerOrgs := organizations[1:]  // All peer orgs
+	ordererOrg := organizations[0]
+	peerOrgs := organizations[1:]
 
 	profiles := map[string]interface{}{
 		"FabricXOrdererGenesis": map[string]interface{}{
@@ -375,10 +379,14 @@ func generateConfigTxYAML(net *Network) map[string]interface{} {
 }
 
 // generateGenesisBlock uses Docker to run configtxgen
-func generateGenesisBlock(net *Network) error {
-	genesisPath := filepath.Join(net.ConfigPath, "genesis.block")
+func generateGenesisBlock(ctx context.Context, net *Network) error {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return errors.Wrap("generateGenesisBlock", err)
+	}
 
-	cmd := exec.Command("docker", "run", "--rm",
+	exec := net.GetExecutor()
+	output, err := exec.ExecuteCombined(ctx, "docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:/config", net.ConfigPath),
 		"-v", fmt.Sprintf("%s:/crypto-config", net.CryptoPath),
 		"-e", "FABRIC_CFG_PATH=/config",
@@ -389,20 +397,26 @@ func generateGenesisBlock(net *Network) error {
 		"-outputBlock", "/config/genesis.block",
 	)
 
-	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to generate genesis block: %w\nOutput: %s", err, string(output))
+		return errors.WrapWithContext("generateGenesisBlock", err, map[string]interface{}{
+			"output": string(output),
+		})
 	}
 
-	_ = genesisPath // Keep for reference
 	return nil
 }
 
 // generateChannelTx uses Docker to run configtxgen
-func generateChannelTx(net *Network) error {
+func generateChannelTx(ctx context.Context, net *Network) error {
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return errors.Wrap("generateChannelTx", err)
+	}
+
 	channelTxPath := fmt.Sprintf("%s.tx", net.Channel.Name)
 
-	cmd := exec.Command("docker", "run", "--rm",
+	exec := net.GetExecutor()
+	output, err := exec.ExecuteCombined(ctx, "docker", "run", "--rm",
 		"-v", fmt.Sprintf("%s:/config", net.ConfigPath),
 		"-v", fmt.Sprintf("%s:/crypto-config", net.CryptoPath),
 		"-e", "FABRIC_CFG_PATH=/config",
@@ -413,9 +427,10 @@ func generateChannelTx(net *Network) error {
 		"-channelID", net.Channel.Name,
 	)
 
-	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to generate channel tx: %w\nOutput: %s", err, string(output))
+		return errors.WrapWithContext("generateChannelTx", err, map[string]interface{}{
+			"output": string(output),
+		})
 	}
 
 	return nil
