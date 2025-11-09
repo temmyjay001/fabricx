@@ -118,14 +118,40 @@ func (d *Deployer) packageChaincode(ctx context.Context, req *DeployRequest) (st
 		return "", errors.Wrap("packageChaincode", err)
 	}
 
+	// Convert to absolute paths
+	absChaincodePath, err := filepath.Abs(req.Path)
+	if err != nil {
+		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
+			"path": req.Path,
+		})
+	}
+
+	absPackagePath, err := filepath.Abs(packagePath)
+	if err != nil {
+		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
+			"path": packagePath,
+		})
+	}
+
+	// Ensure output directory exists
+	packageDir := filepath.Dir(absPackagePath)
+	if _, err := d.exec.ExecuteCombined(ctx, "mkdir", "-p", packageDir); err != nil {
+		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
+			"dir": packageDir,
+		})
+	}
+
+	fmt.Printf("📦 Packaging chaincode from: %s\n", absChaincodePath)
+	fmt.Printf("   Output: %s\n", absPackagePath)
+
 	// Run peer lifecycle chaincode package inside Docker
 	output, err := d.exec.ExecuteCombined(ctx, "docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/chaincode", filepath.Dir(req.Path)),
-		"-v", fmt.Sprintf("%s:/output", filepath.Dir(packagePath)),
+		"-v", fmt.Sprintf("%s:/chaincode", absChaincodePath),
+		"-v", fmt.Sprintf("%s:/output", packageDir),
 		fabricToolsImage,
 		"peer", "lifecycle", "chaincode", "package",
 		fmt.Sprintf("/output/%s.tar.gz", req.Name),
-		"--path", fmt.Sprintf("/chaincode/%s", filepath.Base(req.Path)),
+		"--path", "/chaincode",
 		"--lang", req.Language,
 		"--label", fmt.Sprintf("%s_%s", req.Name, req.Version),
 	)
@@ -137,7 +163,8 @@ func (d *Deployer) packageChaincode(ctx context.Context, req *DeployRequest) (st
 		})
 	}
 
-	return packagePath, nil
+	fmt.Printf("✓ Chaincode packaged successfully\n")
+	return absPackagePath, nil
 }
 
 func (d *Deployer) installChaincode(ctx context.Context, org *network.Organization, peer *network.Peer, packageFile string) error {
@@ -145,6 +172,8 @@ func (d *Deployer) installChaincode(ctx context.Context, org *network.Organizati
 	if err := ctx.Err(); err != nil {
 		return errors.Wrap("installChaincode", err)
 	}
+
+	fmt.Printf("📥 Installing on %s...\n", peer.Name)
 
 	// Copy package to peer container
 	containerName := peer.Name
@@ -172,6 +201,7 @@ func (d *Deployer) installChaincode(ctx context.Context, org *network.Organizati
 		})
 	}
 
+	fmt.Printf("✓ Installed on %s\n", peer.Name)
 	return nil
 }
 
@@ -180,6 +210,8 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 	if err := ctx.Err(); err != nil {
 		return errors.Wrap("approveChaincode", err)
 	}
+
+	fmt.Printf("✅ Approving for %s...\n", org.Name)
 
 	// Get package ID from the peer container
 	packageID, err := d.getPackageID(ctx, org, req.Name, req.Version)
@@ -217,6 +249,7 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 		})
 	}
 
+	fmt.Printf("✓ Approved for %s\n", org.Name)
 	return nil
 }
 
@@ -225,6 +258,8 @@ func (d *Deployer) commitChaincode(ctx context.Context, req *DeployRequest) erro
 	if err := ctx.Err(); err != nil {
 		return errors.Wrap("commitChaincode", err)
 	}
+
+	fmt.Printf("💾 Committing chaincode to channel...\n")
 
 	// Use first org for commit
 	org := d.network.Orgs[0]
@@ -264,6 +299,7 @@ func (d *Deployer) commitChaincode(ctx context.Context, req *DeployRequest) erro
 		})
 	}
 
+	fmt.Printf("✓ Chaincode committed\n")
 	return nil
 }
 
