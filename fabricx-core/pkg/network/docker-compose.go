@@ -214,6 +214,116 @@ func generateCouchDBService(net *Network, org *Organization, peer *Peer, index i
 	}
 }
 
+// generateCoreYAML creates a minimal core.yaml for the CLI container
+func generateCoreYAML(net *Network) error {
+	coreYAMLPath := filepath.Join(net.ConfigPath, "core.yaml")
+	
+	coreConfig := map[string]interface{}{
+		"peer": map[string]interface{}{
+			"id": "cli",
+			"networkId": "fabricx",
+			"address": "0.0.0.0:7051",
+			"addressAutoDetect": false,
+			"gomaxprocs": -1,
+			"keepalive": map[string]interface{}{
+				"minInterval": "60s",
+				"client": map[string]interface{}{
+					"interval": "60s",
+					"timeout": "20s",
+				},
+				"deliveryClient": map[string]interface{}{
+					"interval": "60s",
+					"timeout": "20s",
+				},
+			},
+			"gossip": map[string]interface{}{
+				"bootstrap": "127.0.0.1:7051",
+				"useLeaderElection": true,
+				"orgLeader": false,
+				"endpoint": "",
+				"maxBlockCountToStore": 100,
+				"maxPropagationBurstLatency": "10ms",
+				"maxPropagationBurstSize": 10,
+				"propagateIterations": 1,
+				"propagatePeerNum": 3,
+				"pullInterval": "4s",
+				"pullPeerNum": 3,
+				"requestStateInfoInterval": "4s",
+				"publishStateInfoInterval": "4s",
+				"stateInfoRetentionInterval": "",
+				"publishCertPeriod": "10s",
+				"skipBlockVerification": false,
+				"dialTimeout": "3s",
+				"connTimeout": "2s",
+				"recvBuffSize": 20,
+				"sendBuffSize": 200,
+				"digestWaitTime": "1s",
+				"requestWaitTime": "1500ms",
+				"responseWaitTime": "2s",
+				"aliveTimeInterval": "5s",
+				"aliveExpirationTimeout": "25s",
+				"reconnectInterval": "25s",
+				"election": map[string]interface{}{
+					"startupGracePeriod": "15s",
+					"membershipSampleInterval": "1s",
+					"leaderAliveThreshold": "10s",
+					"leaderElectionDuration": "5s",
+				},
+			},
+			"tls": map[string]interface{}{
+				"enabled": false,
+			},
+			"bccsp": map[string]interface{}{
+				"default": "SW",
+				"sw": map[string]interface{}{
+					"hash": "SHA2",
+					"security": 256,
+				},
+			},
+			"fileSystemPath": "/var/hyperledger/production",
+		},
+		"vm": map[string]interface{}{
+			"endpoint": "unix:///host/var/run/docker.sock",
+		},
+		"chaincode": map[string]interface{}{
+			"builder": "$(DOCKER_NS)/fabric-ccenv:$(TWO_DIGIT_VERSION)",
+			"pull": false,
+			"golang": map[string]interface{}{
+				"runtime": "$(DOCKER_NS)/fabric-baseos:$(TWO_DIGIT_VERSION)",
+				"dynamicLink": false,
+			},
+			"java": map[string]interface{}{
+				"runtime": "$(DOCKER_NS)/fabric-javaenv:$(TWO_DIGIT_VERSION)",
+			},
+			"node": map[string]interface{}{
+				"runtime": "$(DOCKER_NS)/fabric-nodeenv:$(TWO_DIGIT_VERSION)",
+			},
+			"startuptimeout": "300s",
+			"executetimeout": "30s",
+			"mode": "net",
+			"keepalive": 0,
+		},
+		"ledger": map[string]interface{}{
+			"state": map[string]interface{}{
+				"stateDatabase": "goleveldb",
+				"couchDBConfig": map[string]interface{}{
+					"couchDBAddress": "127.0.0.1:5984",
+					"username": "",
+					"password": "",
+					"maxRetries": 3,
+					"maxRetriesOnStartup": 10,
+					"requestTimeout": "35s",
+					"queryLimit": 10000,
+					"maxBatchUpdateSize": 1000,
+					"warmIndexesAfterNBlocks": 1,
+				},
+			},
+		},
+	}
+	
+	return utils.WriteYAML(coreYAMLPath, coreConfig)
+}
+
 // generateCLIService creates a CLI container with fabric-tools for executing commands
 func generateCLIService(net *Network) map[string]interface{} {
 	// Use first org for CLI

@@ -135,6 +135,11 @@ func Bootstrap(ctx context.Context, config *Config, exec executor.Executor) (*Ne
 		return nil, errors.Wrap("Bootstrap.GenerateConfigTx", err)
 	}
 
+	if err:= generateCoreYAML(net); err != nil {
+		net.Cleanup()
+		return nil, errors.Wrap("Bootstrap.GenerateCoreYAML", err)
+	}
+
 	// Generate genesis block
 	if err := generateGenesisBlock(ctx, net); err != nil {
 		net.Cleanup()
