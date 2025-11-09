@@ -7,6 +7,7 @@ import ora from 'ora';
 import { readFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { RetryStrategy } from '@fabricx/sdk/src/utils/retry';
 
 /**
  * CLI Configuration
@@ -69,7 +70,7 @@ function createFabricX(config: CliConfig): FabricX {
     retry: {
       maxAttempts: 3,
       initialDelay: 1000,
-      strategy: 'exponential',
+      strategy: 'exponential' as RetryStrategy,
       backoffMultiplier: 2,
     },
   });
