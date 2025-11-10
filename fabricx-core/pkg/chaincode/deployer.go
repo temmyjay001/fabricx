@@ -223,9 +223,9 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 	policy := d.buildEndorsementPolicy(req.EndorsementPolicyOrgs)
 
 	// Execute approve inside peer container
-	// env := d.getPeerEnvArgs(org, peer)
+	env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	// args = append(args, env...)
+	args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "approveformyorg",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
@@ -274,9 +274,9 @@ func (d *Deployer) commitChaincode(ctx context.Context, req *DeployRequest) erro
 	policy := d.buildEndorsementPolicy(req.EndorsementPolicyOrgs)
 
 	// Execute commit inside peer container
-	// env := d.getPeerEnvArgs(org, peer)
+	env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	// args = append(args, env...)
+	args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "commit",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
