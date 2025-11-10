@@ -61,8 +61,6 @@ func (n *Network) CreateChannel(ctx context.Context) error {
 func (n *Network) JoinPeersToChannel(ctx context.Context) error {
 	fmt.Println("🔗 Joining peers to channel...")
 
-	channelBlock := fmt.Sprintf("/etc/hyperledger/fabric/config/%s.block", n.Channel.Name)
-
 	for _, org := range n.Orgs {
 		for _, peer := range org.Peers {
 			// Check context
@@ -70,32 +68,32 @@ func (n *Network) JoinPeersToChannel(ctx context.Context) error {
 				return errors.Wrap("JoinPeersToChannel", err)
 			}
 
-			fmt.Printf("   Joining %s...\n", peer.Name)
+			fmt.Printf("   Joining %s to channel %s...\n", peer.Name, n.Channel.Name)
 
-			env := []string{
-				"-e", fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
-				"-e", fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", peer.Name, peer.Port),
-				"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
-				"-e", "CORE_PEER_TLS_ENABLED=false",
-			}
-
-			args := []string{"exec"}
-			args = append(args, env...)
-			args = append(args, "cli",
+			// Execute join directly in the peer container using its own identity
+			// The peer container now has the config directory mounted with the channel block
+			args := []string{"exec", peer.Name,
 				"peer", "channel", "join",
-				"-b", channelBlock,
-			)
+				"-b", fmt.Sprintf("/etc/hyperledger/fabric/config/%s.block", n.Channel.Name),
+			}
 
 			output, err := n.exec.ExecuteCombined(ctx, "docker", args...)
 			if err != nil {
+				// Log the full error for debugging
+				fmt.Printf("   ⚠ Error: %s\n", string(output))
+				
 				return errors.WrapWithContext("JoinPeersToChannel", err, map[string]interface{}{
-					"peer":   peer.Name,
-					"org":    org.Name,
-					"output": string(output),
+					"peer":    peer.Name,
+					"org":     org.Name,
+					"channel": n.Channel.Name,
+					"output":  string(output),
 				})
 			}
 
 			fmt.Printf("   ✓ %s joined channel\n", peer.Name)
+			
+			// Give the peer time to process the join
+			time.Sleep(2 * time.Second)
 		}
 	}
 

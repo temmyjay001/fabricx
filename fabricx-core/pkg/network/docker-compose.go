@@ -168,6 +168,7 @@ func generatePeerService(net *Network, org *Organization, peer *Peer, index int,
 			// Mount admin MSP for CLI operations inside container
 			fmt.Sprintf("%s/peerOrganizations/%s/users:/etc/hyperledger/fabric/users", net.CryptoPath, org.Domain),
 			fmt.Sprintf("peer%d.%s:/var/hyperledger/production", index, org.Domain),
+			fmt.Sprintf("%s:/etc/hyperledger/fabric/config", net.ConfigPath),
 		},
 		"ports": []string{
 			fmt.Sprintf("%d:%d", peer.Port, peer.Port),

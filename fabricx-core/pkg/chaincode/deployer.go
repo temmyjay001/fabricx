@@ -186,11 +186,8 @@ func (d *Deployer) installChaincode(ctx context.Context, org *network.Organizati
 	}
 
 	// Execute install inside peer container
-	env := d.getPeerEnvArgs(org, peer)
-	args := []string{"exec"}
-	args = append(args, env...)
-	args = append(args, containerName,
-		"peer", "lifecycle", "chaincode", "install", "/tmp/chaincode.tar.gz")
+	args := []string{"exec", containerName,
+		"peer", "lifecycle", "chaincode", "install", "/tmp/chaincode.tar.gz"}
 
 	output, err = d.exec.ExecuteCombined(ctx, "docker", args...)
 	if err != nil {
@@ -226,9 +223,9 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 	policy := d.buildEndorsementPolicy(req.EndorsementPolicyOrgs)
 
 	// Execute approve inside peer container
-	env := d.getPeerEnvArgs(org, peer)
+	// env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	args = append(args, env...)
+	// args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "approveformyorg",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
@@ -277,9 +274,9 @@ func (d *Deployer) commitChaincode(ctx context.Context, req *DeployRequest) erro
 	policy := d.buildEndorsementPolicy(req.EndorsementPolicyOrgs)
 
 	// Execute commit inside peer container
-	env := d.getPeerEnvArgs(org, peer)
+	// env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	args = append(args, env...)
+	// args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "commit",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
@@ -314,9 +311,9 @@ func (d *Deployer) initChaincode(ctx context.Context, req *DeployRequest) error 
 	peer := org.Peers[0]
 	containerName := peer.Name
 
-	env := d.getPeerEnvArgs(org, peer)
+	// env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	args = append(args, env...)
+	// args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "chaincode", "invoke",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
@@ -344,9 +341,9 @@ func (d *Deployer) getPackageID(ctx context.Context, org *network.Organization, 
 	peer := org.Peers[0]
 	containerName := peer.Name
 
-	env := d.getPeerEnvArgs(org, peer)
+	// env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	args = append(args, env...)
+	// args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "queryinstalled")
 
