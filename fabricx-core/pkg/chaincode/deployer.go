@@ -223,8 +223,14 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 	// Build endorsement policy
 	policy := d.buildEndorsementPolicy(req.EndorsementPolicyOrgs)
 
+	peerAddresses := []string{}
+	for _, o := range d.network.Orgs {
+		for _, p := range o.Peers {
+			peerAddresses = append(peerAddresses, "--peerAddresses", fmt.Sprintf("%s:%d", p.Name, p.Port))
+		}
+	}
+
 	args := []string{"exec"}
-	// args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "approveformyorg",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
@@ -235,6 +241,8 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 		"--sequence", "1",
 		"--signature-policy", policy,
 	)
+
+	args = append(args, peerAddresses...)
 
 	log.Println(args)
 
