@@ -4,6 +4,7 @@ package chaincode
 import (
 	"context"
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 
@@ -222,10 +223,8 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 	// Build endorsement policy
 	policy := d.buildEndorsementPolicy(req.EndorsementPolicyOrgs)
 
-	// Execute approve inside peer container
-	env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	args = append(args, env...)
+	// args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "approveformyorg",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
@@ -236,6 +235,8 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 		"--sequence", "1",
 		"--signature-policy", policy,
 	)
+
+	log.Println(args)
 
 	output, err := d.exec.ExecuteCombined(ctx, "docker", args...)
 	if err != nil {
