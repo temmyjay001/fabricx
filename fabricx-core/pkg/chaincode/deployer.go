@@ -382,6 +382,7 @@ func (d *Deployer) getPeerEnvArgs(org *network.Organization, peer *network.Peer)
 		"-e", fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", peer.Name, peer.Port),
 		"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/users/Admin@%s/msp", org.Domain),
 		"-e", "CORE_PEER_TLS_ENABLED=false",
+		"-e", "FABRIC_CFG_PATH=/etc/hyperledger/fabric/config",
 	}
 }
 
