@@ -4,7 +4,6 @@ package chaincode
 import (
 	"context"
 	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 
@@ -176,8 +175,8 @@ func (d *Deployer) installChaincode(ctx context.Context, org *network.Organizati
 
 	fmt.Printf("📥 Installing on %s...\n", peer.Name)
 
-	// Copy package to peer container
-	containerName := peer.Name
+	// Copy package to cli container
+	containerName := "cli"
 	output, err := d.exec.ExecuteCombined(ctx, "docker", "cp", packageFile, fmt.Sprintf("%s:/tmp/chaincode.tar.gz", containerName))
 	if err != nil {
 		return errors.WrapWithContext("installChaincode.Copy", err, map[string]interface{}{
@@ -186,9 +185,12 @@ func (d *Deployer) installChaincode(ctx context.Context, org *network.Organizati
 		})
 	}
 
-	// Execute install inside peer container
-	args := []string{"exec", containerName,
-		"peer", "lifecycle", "chaincode", "install", "/tmp/chaincode.tar.gz"}
+	// Execute install inside cli container
+	env := d.getPeerEnvArgs(org, peer)
+	args := []string{"exec"}
+	args = append(args, env...)
+	args = append(args, containerName,
+		"peer", "lifecycle", "chaincode", "install", "/tmp/chaincode.tar.gz")
 
 	output, err = d.exec.ExecuteCombined(ctx, "docker", args...)
 	if err != nil {
@@ -218,20 +220,16 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 	}
 
 	peer := org.Peers[0]
-	containerName := peer.Name
+	// containerName := peer.Name
 
 	// Build endorsement policy
 	policy := d.buildEndorsementPolicy(req.EndorsementPolicyOrgs)
 
-	peerAddresses := []string{}
-	for _, o := range d.network.Orgs {
-		for _, p := range o.Peers {
-			peerAddresses = append(peerAddresses, "--peerAddresses", fmt.Sprintf("%s:%d", p.Name, p.Port))
-		}
-	}
+	env := d.getPeerEnvArgs(org, peer)
 
 	args := []string{"exec"}
-	args = append(args, containerName,
+	args = append(args, env...)
+	args = append(args, "cli",
 		"peer", "lifecycle", "chaincode", "approveformyorg",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
 		"--channelID", d.network.Channel.Name,
@@ -241,10 +239,6 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 		"--sequence", "1",
 		"--signature-policy", policy,
 	)
-
-	args = append(args, peerAddresses...)
-
-	log.Println(args)
 
 	output, err := d.exec.ExecuteCombined(ctx, "docker", args...)
 	if err != nil {
@@ -270,7 +264,7 @@ func (d *Deployer) commitChaincode(ctx context.Context, req *DeployRequest) erro
 	// Use first org for commit
 	org := d.network.Orgs[0]
 	peer := org.Peers[0]
-	containerName := peer.Name
+	containerName := "cli"
 
 	// Build peer addresses
 	peerAddresses := []string{}
@@ -318,11 +312,11 @@ func (d *Deployer) initChaincode(ctx context.Context, req *DeployRequest) error 
 	// Attempt to invoke Init function
 	org := d.network.Orgs[0]
 	peer := org.Peers[0]
-	containerName := peer.Name
+	containerName := "cli"
 
-	// env := d.getPeerEnvArgs(org, peer)
+	env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	// args = append(args, env...)
+	args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "chaincode", "invoke",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
@@ -348,11 +342,11 @@ func (d *Deployer) getPackageID(ctx context.Context, org *network.Organization, 
 	}
 
 	peer := org.Peers[0]
-	containerName := peer.Name
+	containerName := "cli"
 
-	// env := d.getPeerEnvArgs(org, peer)
+	env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
-	// args = append(args, env...)
+	args = append(args, env...)
 	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "queryinstalled")
 
@@ -389,7 +383,7 @@ func (d *Deployer) getPeerEnvArgs(org *network.Organization, peer *network.Peer)
 	return []string{
 		"-e", fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
 		"-e", fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", peer.Name, peer.Port),
-		"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/users/Admin@%s/msp", org.Domain),
+		"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
 		"-e", "CORE_PEER_TLS_ENABLED=false",
 		"-e", "FABRIC_CFG_PATH=/etc/hyperledger/fabric/config",
 	}

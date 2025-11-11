@@ -3,6 +3,7 @@ package network
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 
 	"github.com/temmyjay001/fabricx-core/pkg/utils"
@@ -40,7 +41,7 @@ func generateVolumes(net *Network) map[string]interface{} {
 		for j := range org.Peers {
 			peerVolumeName := fmt.Sprintf("peer%d.%s", j, org.Domain)
 			volumes[peerVolumeName] = nil
-			
+
 			if org.Peers[j].CouchDB {
 				couchVolumeName := fmt.Sprintf("couchdb%d.%s", j, org.Domain)
 				volumes[couchVolumeName] = nil
@@ -156,7 +157,8 @@ func generatePeerService(net *Network, org *Organization, peer *Peer, index int,
 			fmt.Sprintf("CORE_PEER_GOSSIP_EXTERNALENDPOINT=%s:%d", peer.Name, peer.Port),
 			fmt.Sprintf("CORE_PEER_GOSSIP_BOOTSTRAP=%s:%d", peer.Name, peer.Port),
 			fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
-			fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/users/Admin@%s/msp", org.Domain),
+			// fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/users/Admin@%s/msp", org.Domain),
+			"CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp",
 			"CORE_PEER_TLS_ENABLED=false",
 			"CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:9443",
 		},
@@ -219,57 +221,57 @@ func generateCouchDBService(net *Network, org *Organization, peer *Peer, index i
 // generateCoreYAML creates a minimal core.yaml for the CLI container
 func generateCoreYAML(net *Network) error {
 	coreYAMLPath := filepath.Join(net.ConfigPath, "core.yaml")
-	
+
 	coreConfig := map[string]interface{}{
 		"peer": map[string]interface{}{
-			"id": "cli",
-			"networkId": "fabricx",
-			"address": "0.0.0.0:7051",
+			"id":                "cli",
+			"networkId":         "fabricx",
+			"address":           "0.0.0.0:7051",
 			"addressAutoDetect": false,
-			"gomaxprocs": -1,
+			"gomaxprocs":        -1,
 			"keepalive": map[string]interface{}{
 				"minInterval": "60s",
 				"client": map[string]interface{}{
 					"interval": "60s",
-					"timeout": "20s",
+					"timeout":  "20s",
 				},
 				"deliveryClient": map[string]interface{}{
 					"interval": "60s",
-					"timeout": "20s",
+					"timeout":  "20s",
 				},
 			},
 			"gossip": map[string]interface{}{
-				"bootstrap": "127.0.0.1:7051",
-				"useLeaderElection": true,
-				"orgLeader": false,
-				"endpoint": "",
-				"maxBlockCountToStore": 100,
+				"bootstrap":                  "127.0.0.1:7051",
+				"useLeaderElection":          true,
+				"orgLeader":                  false,
+				"endpoint":                   "",
+				"maxBlockCountToStore":       100,
 				"maxPropagationBurstLatency": "10ms",
-				"maxPropagationBurstSize": 10,
-				"propagateIterations": 1,
-				"propagatePeerNum": 3,
-				"pullInterval": "4s",
-				"pullPeerNum": 3,
-				"requestStateInfoInterval": "4s",
-				"publishStateInfoInterval": "4s",
+				"maxPropagationBurstSize":    10,
+				"propagateIterations":        1,
+				"propagatePeerNum":           3,
+				"pullInterval":               "4s",
+				"pullPeerNum":                3,
+				"requestStateInfoInterval":   "4s",
+				"publishStateInfoInterval":   "4s",
 				"stateInfoRetentionInterval": "",
-				"publishCertPeriod": "10s",
-				"skipBlockVerification": false,
-				"dialTimeout": "3s",
-				"connTimeout": "2s",
-				"recvBuffSize": 20,
-				"sendBuffSize": 200,
-				"digestWaitTime": "1s",
-				"requestWaitTime": "1500ms",
-				"responseWaitTime": "2s",
-				"aliveTimeInterval": "5s",
-				"aliveExpirationTimeout": "25s",
-				"reconnectInterval": "25s",
+				"publishCertPeriod":          "10s",
+				"skipBlockVerification":      false,
+				"dialTimeout":                "3s",
+				"connTimeout":                "2s",
+				"recvBuffSize":               20,
+				"sendBuffSize":               200,
+				"digestWaitTime":             "1s",
+				"requestWaitTime":            "1500ms",
+				"responseWaitTime":           "2s",
+				"aliveTimeInterval":          "5s",
+				"aliveExpirationTimeout":     "25s",
+				"reconnectInterval":          "25s",
 				"election": map[string]interface{}{
-					"startupGracePeriod": "15s",
+					"startupGracePeriod":       "15s",
 					"membershipSampleInterval": "1s",
-					"leaderAliveThreshold": "10s",
-					"leaderElectionDuration": "5s",
+					"leaderAliveThreshold":     "10s",
+					"leaderElectionDuration":   "5s",
 				},
 			},
 			"tls": map[string]interface{}{
@@ -278,7 +280,7 @@ func generateCoreYAML(net *Network) error {
 			"bccsp": map[string]interface{}{
 				"default": "SW",
 				"sw": map[string]interface{}{
-					"hash": "SHA2",
+					"hash":     "SHA2",
 					"security": 256,
 				},
 			},
@@ -289,9 +291,9 @@ func generateCoreYAML(net *Network) error {
 		},
 		"chaincode": map[string]interface{}{
 			"builder": "$(DOCKER_NS)/fabric-ccenv:$(TWO_DIGIT_VERSION)",
-			"pull": false,
+			"pull":    false,
 			"golang": map[string]interface{}{
-				"runtime": "$(DOCKER_NS)/fabric-baseos:$(TWO_DIGIT_VERSION)",
+				"runtime":     "$(DOCKER_NS)/fabric-baseos:$(TWO_DIGIT_VERSION)",
 				"dynamicLink": false,
 			},
 			"java": map[string]interface{}{
@@ -302,27 +304,27 @@ func generateCoreYAML(net *Network) error {
 			},
 			"startuptimeout": "300s",
 			"executetimeout": "30s",
-			"mode": "net",
-			"keepalive": 0,
+			"mode":           "net",
+			"keepalive":      0,
 		},
 		"ledger": map[string]interface{}{
 			"state": map[string]interface{}{
 				"stateDatabase": "goleveldb",
 				"couchDBConfig": map[string]interface{}{
-					"couchDBAddress": "127.0.0.1:5984",
-					"username": "",
-					"password": "",
-					"maxRetries": 3,
-					"maxRetriesOnStartup": 10,
-					"requestTimeout": "35s",
-					"queryLimit": 10000,
-					"maxBatchUpdateSize": 1000,
+					"couchDBAddress":          "127.0.0.1:5984",
+					"username":                "",
+					"password":                "",
+					"maxRetries":              3,
+					"maxRetriesOnStartup":     10,
+					"requestTimeout":          "35s",
+					"queryLimit":              10000,
+					"maxBatchUpdateSize":      1000,
 					"warmIndexesAfterNBlocks": 1,
 				},
 			},
 		},
 	}
-	
+
 	return utils.WriteYAML(coreYAMLPath, coreConfig)
 }
 
@@ -331,6 +333,9 @@ func generateCLIService(net *Network) map[string]interface{} {
 	// Use first org for CLI
 	org := net.Orgs[0]
 
+	log.Println(net.Config)
+	log.Println(net.CryptoPath)
+
 	// Build volume mounts for all orgs
 	volumes := []string{
 		"/var/run/docker.sock:/host/var/run/docker.sock",
@@ -338,10 +343,12 @@ func generateCLIService(net *Network) map[string]interface{} {
 		fmt.Sprintf("%s:/etc/hyperledger/fabric/crypto", net.CryptoPath),
 	}
 
+	log.Println(volumes)
+
 	// Mount all org MSPs so CLI can switch between orgs
 	for _, o := range net.Orgs {
-		volumes = append(volumes, 
-			fmt.Sprintf("%s/peerOrganizations/%s/users:/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users", 
+		volumes = append(volumes,
+			fmt.Sprintf("%s/peerOrganizations/%s/users:/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users",
 				net.CryptoPath, o.Domain, o.Domain))
 	}
 
