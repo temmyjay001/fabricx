@@ -31,6 +31,19 @@ func TestBootstrap(t *testing.T) {
 			setup: func(m *executor.MockExecutor) {
 				m.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 					// Mock successful docker operations
+					// Handle different commands
+					if len(args) > 0 {
+						switch args[0] {
+						case "run":
+							// Mock cryptogen, configtxgen
+							return []byte("success"), nil
+						case "exec":
+							// Mock peer commands
+							return []byte("success"), nil
+						default:
+							return []byte("success"), nil
+						}
+					}
 					return []byte("success"), nil
 				}
 			},
@@ -46,7 +59,7 @@ func TestBootstrap(t *testing.T) {
 			setup: func(m *executor.MockExecutor) {
 				m.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 					// Fail on cryptogen
-					if len(args) > 0 && args[len(args)-1] == "cryptogen" {
+					if len(args) > 1 && args[0] == "run" && contains(args, "cryptogen") {
 						return nil, fmt.Errorf("cryptogen failed")
 					}
 					return []byte("success"), nil
@@ -103,6 +116,11 @@ func TestBootstrap(t *testing.T) {
 
 				if tt.config.ChannelName == "" && net.Channel.Name != "mychannel" {
 					t.Errorf("Expected default channel name, got %s", net.Channel.Name)
+				}
+
+				// Verify paths exist
+				if _, err := os.Stat(net.BasePath); os.IsNotExist(err) {
+					t.Errorf("Expected base path to exist: %s", net.BasePath)
 				}
 
 				// Cleanup
@@ -226,24 +244,45 @@ func TestGenerateOrderers(t *testing.T) {
 func TestWaitForReady(t *testing.T) {
 	tests := []struct {
 		name        string
-		setupNet    func(*Network)
+		setupNet    func(*Network, *executor.MockExecutor)
 		timeout     time.Duration
 		wantErr     bool
 		wantErrType error
 	}{
 		{
 			name: "network becomes ready",
-			setupNet: func(net *Network) {
-				// Network will be ready immediately
+			setupNet: func(net *Network, mockExec *executor.MockExecutor) {
+				// Mock successful readiness checks and channel operations
+				mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					if len(args) > 0 {
+						// Handle different commands
+						if contains(args, "channel") && contains(args, "create") {
+							return []byte("Channel created"), nil
+						}
+						if contains(args, "channel") && contains(args, "join") {
+							return []byte("Joined channel"), nil
+						}
+						if contains(args, "channel") && contains(args, "update") {
+							return []byte("Updated anchor"), nil
+						}
+					}
+					return []byte("success"), nil
+				}
 			},
 			timeout: 5 * time.Second,
 			wantErr: false,
 		},
 		{
 			name: "timeout waiting for ready",
-			setupNet: func(net *Network) {
-				// Override checkReadiness to always return false
-				// (In real implementation, this would check actual containers)
+			setupNet: func(net *Network, mockExec *executor.MockExecutor) {
+				// Make readiness check fail
+				mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+					// Fail exec commands to simulate containers not ready
+					if len(args) > 0 && args[0] == "exec" {
+						return nil, fmt.Errorf("container not ready")
+					}
+					return []byte("success"), nil
+				}
 			},
 			timeout:     100 * time.Millisecond,
 			wantErr:     true,
@@ -253,15 +292,35 @@ func TestWaitForReady(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockExec := executor.NewMockExecutor()
+			
 			net := &Network{
 				ID:   "test-net-123",
 				Name: "test-network",
 				Orgs: []*Organization{
-					{Name: "Org1"},
+					{
+						Name:   "Org1",
+						MSPID:  "Org1MSP",
+						Domain: "org1.example.com",
+						Peers: []*Peer{
+							{Name: "peer0.org1.example.com", Port: 7051},
+						},
+					},
 				},
+				Orderers: []*Orderer{
+					{Name: "orderer.example.com", Port: 7050},
+				},
+				Channel: &Channel{
+					Name:        "mychannel",
+					ProfileName: "TestChannel",
+				},
+				BasePath:   "/tmp/test",
+				ConfigPath: "/tmp/test/config",
+				CryptoPath: "/tmp/test/crypto",
+				exec:       mockExec,
 			}
 
-			tt.setupNet(net)
+			tt.setupNet(net, mockExec)
 
 			ctx, cancel := context.WithTimeout(context.Background(), tt.timeout)
 			defer cancel()
@@ -441,6 +500,16 @@ func TestGenerateCryptoConfig(t *testing.T) {
 	if peerOrgs[0]["Domain"] != "org1.example.com" {
 		t.Errorf("Expected first org domain 'org1.example.com', got %v", peerOrgs[0]["Domain"])
 	}
+}
+
+// Helper function
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 // Benchmark tests

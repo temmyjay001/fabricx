@@ -4,6 +4,8 @@ package chaincode
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,10 +15,14 @@ import (
 )
 
 func createMockNetwork() *network.Network {
+	tempDir, _ := os.MkdirTemp("", "fabricx-test-*")
+
 	return &network.Network{
-		ID:       "test-net-123",
-		Name:     "test-network",
-		BasePath: "/tmp/test",
+		ID:         "test-net-123",
+		Name:       "test-network",
+		BasePath:   tempDir,
+		ConfigPath: filepath.Join(tempDir, "config"),
+		CryptoPath: filepath.Join(tempDir, "crypto"),
 		Orgs: []*network.Organization{
 			{
 				Name:   "Org1",
@@ -39,7 +45,8 @@ func createMockNetwork() *network.Network {
 			{Name: "orderer.example.com", Port: 7050},
 		},
 		Channel: &network.Channel{
-			Name: "mychannel",
+			Name:        "mychannel",
+			ProfileName: "TestChannel",
 		},
 	}
 }
@@ -48,7 +55,7 @@ func TestDeploy(t *testing.T) {
 	tests := []struct {
 		name    string
 		req     *DeployRequest
-		setup   func(*executor.MockExecutor)
+		setup   func(*executor.MockExecutor, string)
 		wantErr bool
 		errType error
 	}{
@@ -60,13 +67,34 @@ func TestDeploy(t *testing.T) {
 				Version:  "1.0",
 				Language: "golang",
 			},
-			setup: func(m *executor.MockExecutor) {
+			setup: func(m *executor.MockExecutor, tempDir string) {
+				// Create temp chaincode directory
+				os.MkdirAll(filepath.Join(tempDir, "chaincode"), 0755)
+
 				m.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 					// Simulate successful docker operations
 					if len(args) > 0 {
-						// Simulate package ID query response
-						if args[len(args)-1] == "queryinstalled" {
+						// Handle different commands
+						if contains(args, "package") {
+							// Create a dummy package file
+							pkgPath := filepath.Join(tempDir, "chaincode", "mycc.tar.gz")
+							os.WriteFile(pkgPath, []byte("dummy"), 0644)
+							return []byte("Packaged"), nil
+						}
+						if contains(args, "install") {
+							return []byte("Installed"), nil
+						}
+						if contains(args, "queryinstalled") {
 							return []byte("Package ID: mycc_1.0:hash123, Label: mycc_1.0"), nil
+						}
+						if contains(args, "approveformyorg") {
+							return []byte("Approved"), nil
+						}
+						if contains(args, "commit") {
+							return []byte("Committed"), nil
+						}
+						if contains(args, "invoke") && contains(args, "Init") {
+							return []byte("Initialized"), nil
 						}
 					}
 					return []byte("success"), nil
@@ -81,10 +109,10 @@ func TestDeploy(t *testing.T) {
 				Path:    "/chaincode/mycc",
 				Version: "1.0",
 			},
-			setup: func(m *executor.MockExecutor) {
+			setup: func(m *executor.MockExecutor, tempDir string) {
 				m.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 					// Fail on package command
-					if len(args) > 0 && args[len(args)-1] == "package" {
+					if len(args) > 0 && contains(args, "package") {
 						return nil, fmt.Errorf("package failed")
 					}
 					return []byte("success"), nil
@@ -99,9 +127,16 @@ func TestDeploy(t *testing.T) {
 				Path: "/chaincode/mycc",
 				// Version and Language not provided - should use defaults
 			},
-			setup: func(m *executor.MockExecutor) {
+			setup: func(m *executor.MockExecutor, tempDir string) {
+				os.MkdirAll(filepath.Join(tempDir, "chaincode"), 0755)
+
 				m.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
-					if len(args) > 0 && args[len(args)-1] == "queryinstalled" {
+					if contains(args, "package") {
+						pkgPath := filepath.Join(tempDir, "chaincode", "mycc.tar.gz")
+						os.WriteFile(pkgPath, []byte("dummy"), 0644)
+						return []byte("Packaged"), nil
+					}
+					if contains(args, "queryinstalled") {
 						return []byte("Package ID: mycc_1.0:hash123, Label: mycc_1.0"), nil
 					}
 					return []byte("success"), nil
@@ -114,9 +149,11 @@ func TestDeploy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockExec := executor.NewMockExecutor()
-			tt.setup(mockExec)
-
 			net := createMockNetwork()
+			defer os.RemoveAll(net.BasePath)
+
+			tt.setup(mockExec, net.BasePath)
+
 			dockerMgr := docker.NewManager(mockExec)
 			deployer := NewDeployer(net, dockerMgr, mockExec)
 
@@ -159,6 +196,8 @@ func TestDeployContextCancellation(t *testing.T) {
 	}
 
 	net := createMockNetwork()
+	defer os.RemoveAll(net.BasePath)
+
 	dockerMgr := docker.NewManager(mockExec)
 	deployer := NewDeployer(net, dockerMgr, mockExec)
 
@@ -233,6 +272,8 @@ func TestGetPackageID(t *testing.T) {
 			tt.setup(mockExec)
 
 			net := createMockNetwork()
+			defer os.RemoveAll(net.BasePath)
+
 			dockerMgr := docker.NewManager(mockExec)
 			deployer := NewDeployer(net, dockerMgr, mockExec)
 
@@ -278,13 +319,15 @@ func TestBuildEndorsementPolicy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			net := createMockNetwork()
+			defer os.RemoveAll(net.BasePath)
+
 			dockerMgr := docker.NewManager(executor.NewMockExecutor())
 			deployer := NewDeployer(net, dockerMgr, executor.NewMockExecutor())
 
 			policy := deployer.buildEndorsementPolicy(tt.orgs)
 
 			for _, want := range tt.wantContains {
-				if !containsString(policy, want) {
+				if !containsStr(policy, want) {
 					t.Errorf("buildEndorsementPolicy() = %v, want to contain %v", policy, want)
 				}
 			}
@@ -292,8 +335,17 @@ func TestBuildEndorsementPolicy(t *testing.T) {
 	}
 }
 
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsString(s[1:], substr)))
+func containsStr(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || contains([]string{s}, substr))
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 // Invoker Tests
@@ -315,7 +367,7 @@ func TestInvoke(t *testing.T) {
 			args:      []string{"asset1", "value1"},
 			setup: func(m *executor.MockExecutor) {
 				m.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
-					return []byte("Chaincode invoke successful. txid:abc123def456"), nil
+					return []byte("Chaincode invoke successful. result: status:200 txid [abc123def456] committed with status (VALID)"), nil
 				}
 			},
 			wantTxID: "abc123def456",
@@ -341,6 +393,8 @@ func TestInvoke(t *testing.T) {
 			tt.setup(mockExec)
 
 			net := createMockNetwork()
+			defer os.RemoveAll(net.BasePath)
+
 			invoker := NewInvoker(net, mockExec)
 
 			ctx := context.Background()
@@ -400,6 +454,8 @@ func TestQuery(t *testing.T) {
 			tt.setup(mockExec)
 
 			net := createMockNetwork()
+			defer os.RemoveAll(net.BasePath)
+
 			invoker := NewInvoker(net, mockExec)
 
 			ctx := context.Background()
@@ -418,6 +474,8 @@ func TestQuery(t *testing.T) {
 
 func TestBuildArgsJSON(t *testing.T) {
 	net := createMockNetwork()
+	defer os.RemoveAll(net.BasePath)
+
 	invoker := NewInvoker(net, executor.NewMockExecutor())
 
 	tests := []struct {
@@ -452,6 +510,8 @@ func TestBuildArgsJSON(t *testing.T) {
 
 func TestExtractTxID(t *testing.T) {
 	net := createMockNetwork()
+	defer os.RemoveAll(net.BasePath)
+
 	invoker := NewInvoker(net, executor.NewMockExecutor())
 
 	tests := []struct {
@@ -461,12 +521,12 @@ func TestExtractTxID(t *testing.T) {
 	}{
 		{
 			name:   "valid tx ID",
-			output: "Chaincode invoke successful. result: status:200 txid:abc123def456 payload:...",
+			output: "Chaincode invoke successful. result: status:200 txid [abc123def456] committed with status (VALID)",
 			want:   "abc123def456",
 		},
 		{
 			name:   "tx ID with newlines",
-			output: "Some output\nChaincode invoke successful.\ntxid:xyz789abc\nMore output",
+			output: "Some output\nChaincode invoke successful.\ntxid [xyz789abc] committed\nMore output",
 			want:   "xyz789abc",
 		},
 		{
@@ -490,13 +550,15 @@ func TestExtractTxID(t *testing.T) {
 func BenchmarkDeploy(b *testing.B) {
 	mockExec := executor.NewMockExecutor()
 	mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
-		if len(args) > 0 && args[len(args)-1] == "queryinstalled" {
+		if len(args) > 0 && contains(args, "queryinstalled") {
 			return []byte("Package ID: mycc_1.0:hash123, Label: mycc_1.0"), nil
 		}
 		return []byte("success"), nil
 	}
 
 	net := createMockNetwork()
+	defer os.RemoveAll(net.BasePath)
+
 	dockerMgr := docker.NewManager(mockExec)
 	deployer := NewDeployer(net, dockerMgr, mockExec)
 
@@ -517,10 +579,12 @@ func BenchmarkDeploy(b *testing.B) {
 func BenchmarkInvoke(b *testing.B) {
 	mockExec := executor.NewMockExecutor()
 	mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
-		return []byte("txid:abc123"), nil
+		return []byte("txid [abc123] committed"), nil
 	}
 
 	net := createMockNetwork()
+	defer os.RemoveAll(net.BasePath)
+
 	invoker := NewInvoker(net, mockExec)
 
 	ctx := context.Background()
