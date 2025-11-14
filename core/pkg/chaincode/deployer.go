@@ -4,7 +4,6 @@ package chaincode
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -113,23 +112,43 @@ func (d *Deployer) Deploy(ctx context.Context, req *DeployRequest) (string, erro
 }
 
 func (d *Deployer) packageChaincode(ctx context.Context, req *DeployRequest) (string, error) {
-	// Create a temporary directory for packaging
-	tempDir, err := os.MkdirTemp("", "fabricx-package-")
-	if err != nil {
-		return "", errors.Wrap("packageChaincode.TempDir", err)
+	packagePath := filepath.Join(d.network.BasePath, "chaincode", fmt.Sprintf("%s.tar.gz", req.Name))
+
+	// Check context
+	if err := ctx.Err(); err != nil {
+		return "", errors.Wrap("packageChaincode", err)
 	}
-	defer os.RemoveAll(tempDir)
 
-	packagePath := filepath.Join(tempDir, fmt.Sprintf("%s.tar.gz", req.Name))
+	// Convert to absolute paths
+	absChaincodePath, err := filepath.Abs(req.Path)
+	if err != nil {
+		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
+			"path": req.Path,
+		})
+	}
 
-	fmt.Printf("📦 Packaging chaincode from: %s\n", req.Path)
-	fmt.Printf("   Output: %s\n", packagePath)
+	absPackagePath, err := filepath.Abs(packagePath)
+	if err != nil {
+		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
+			"path": packagePath,
+		})
+	}
+
+	// Ensure output directory exists
+	packageDir := filepath.Dir(absPackagePath)
+	if _, err := d.exec.ExecuteCombined(ctx, "mkdir", "-p", packageDir); err != nil {
+		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
+			"dir": packageDir,
+		})
+	}
+
+	fmt.Printf("📦 Packaging chaincode from: %s\n", absChaincodePath)
+	fmt.Printf("   Output: %s\n", absPackagePath)
 
 	// Run peer lifecycle chaincode package inside Docker
-	// We mount the chaincode path and the output path
 	output, err := d.exec.ExecuteCombined(ctx, "docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/chaincode", req.Path),
-		"-v", fmt.Sprintf("%s:/output", tempDir),
+		"-v", fmt.Sprintf("%s:/chaincode", absChaincodePath),
+		"-v", fmt.Sprintf("%s:/output", packageDir),
 		fabricToolsImage,
 		"peer", "lifecycle", "chaincode", "package",
 		fmt.Sprintf("/output/%s.tar.gz", req.Name),
@@ -146,7 +165,7 @@ func (d *Deployer) packageChaincode(ctx context.Context, req *DeployRequest) (st
 	}
 
 	fmt.Printf("✓ Chaincode packaged successfully\n")
-	return packagePath, nil
+	return absPackagePath, nil
 }
 
 func (d *Deployer) installChaincode(ctx context.Context, org *network.Organization, peer *network.Peer, packageFile string) error {
