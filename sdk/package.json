@@ -9,7 +9,7 @@
     "build": "tsc && npm run copy-proto",
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
-    "copy-proto": "mkdir -p dist/protos && cp ../fabricx-core/protos/fabricx.proto dist/protos/",
+    "copy-proto": "mkdir -p dist/protos && cp ../core/protos/fabricx.proto dist/protos/",
     "prepublishOnly": "npm run clean && npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
