@@ -113,48 +113,64 @@ func Bootstrap(ctx context.Context, config *Config, exec executor.Executor) (*Ne
 
 	// Check context before long operations
 	if err := ctx.Err(); err != nil {
-		net.Cleanup()
+		if cleanupErr := net.Cleanup(); cleanupErr != nil {
+			fmt.Printf("Warning: failed to cleanup network: %v\n", cleanupErr)
+		}
 		return nil, errors.Wrap("Bootstrap", err)
 	}
 
 	// Generate crypto material
 	if err := generateCrypto(ctx, net); err != nil {
-		net.Cleanup()
+		if cleanupErr := net.Cleanup(); cleanupErr != nil {
+			fmt.Printf("Warning: failed to cleanup network: %v\n", cleanupErr)
+		}
 		return nil, errors.Wrap("Bootstrap.GenerateCrypto", err)
 	}
 
 	// Check context
 	if err := ctx.Err(); err != nil {
-		net.Cleanup()
+		if cleanupErr := net.Cleanup(); cleanupErr != nil {
+			fmt.Printf("Warning: failed to cleanup network: %v\n", cleanupErr)
+		}
 		return nil, errors.Wrap("Bootstrap", err)
 	}
 
 	// Generate configtx.yaml
 	if err := generateConfigTx(net); err != nil {
-		net.Cleanup()
+		if cleanupErr := net.Cleanup(); cleanupErr != nil {
+			fmt.Printf("Warning: failed to cleanup network: %v\n", cleanupErr)
+		}
 		return nil, errors.Wrap("Bootstrap.GenerateConfigTx", err)
 	}
 
 	if err := generateCoreYAML(net); err != nil {
-		net.Cleanup()
+		if cleanupErr := net.Cleanup(); cleanupErr != nil {
+			fmt.Printf("Warning: failed to cleanup network: %v\n", cleanupErr)
+		}
 		return nil, errors.Wrap("Bootstrap.GenerateCoreYAML", err)
 	}
 
 	// Generate genesis block
 	if err := generateGenesisBlock(ctx, net); err != nil {
-		net.Cleanup()
+		if cleanupErr := net.Cleanup(); cleanupErr != nil {
+			fmt.Printf("Warning: failed to cleanup network: %v\n", cleanupErr)
+		}
 		return nil, errors.Wrap("Bootstrap.GenerateGenesisBlock", err)
 	}
 
 	// Generate channel configuration
 	if err := generateChannelTx(ctx, net); err != nil {
-		net.Cleanup()
+		if cleanupErr := net.Cleanup(); cleanupErr != nil {
+			fmt.Printf("Warning: failed to cleanup network: %v\n", cleanupErr)
+		}
 		return nil, errors.Wrap("Bootstrap.GenerateChannelTx", err)
 	}
 
 	// Generate docker-compose
 	if err := generateDockerCompose(net); err != nil {
-		net.Cleanup()
+		if cleanupErr := net.Cleanup(); cleanupErr != nil {
+			fmt.Printf("Warning: failed to cleanup network: %v\n", cleanupErr)
+		}
 		return nil, errors.Wrap("Bootstrap.GenerateDockerCompose", err)
 	}
 

@@ -32,7 +32,7 @@ func main() {
 	command := flag.Args()[0]
 
 	// Connect to server
-	conn, err := grpc.Dial(*serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(*serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect to server: %v", err)
 	}
@@ -111,7 +111,9 @@ func initNetwork(client pb.FabricXServiceClient) {
 			networkName = args[i+1]
 			i++
 		} else if args[i] == "--orgs" && i+1 < len(args) {
-			fmt.Sscanf(args[i+1], "%d", &numOrgs)
+			if _, err := fmt.Sscanf(args[i+1], "%d", &numOrgs); err != nil {
+				log.Printf("Warning: could not parse numOrgs: %v", err)
+			}
 			i++
 		} else if args[i] == "--channel" && i+1 < len(args) {
 			channelName = args[i+1]

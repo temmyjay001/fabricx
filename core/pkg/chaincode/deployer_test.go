@@ -69,8 +69,9 @@ func TestDeploy(t *testing.T) {
 				Language: "golang",
 			},
 			setup: func(m *executor.MockExecutor, tempDir string) {
-				// Create temp chaincode directory
-				os.MkdirAll(filepath.Join(tempDir, "chaincode"), 0755)
+				if err := os.MkdirAll(filepath.Join(tempDir, "chaincode"), 0755); err != nil {
+					t.Fatal(err)
+				}
 
 				m.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 					// Simulate successful docker operations
@@ -79,7 +80,9 @@ func TestDeploy(t *testing.T) {
 						if contains(args, "package") {
 							// Create a dummy package file
 							pkgPath := filepath.Join(tempDir, "chaincode", "mycc.tar.gz")
-							os.WriteFile(pkgPath, []byte("dummy"), 0644)
+							if err := os.WriteFile(pkgPath, []byte("dummy"), 0644); err != nil {
+								t.Fatal(err)
+							}
 							return []byte("Packaged"), nil
 						}
 						if contains(args, "install") {
@@ -129,12 +132,16 @@ func TestDeploy(t *testing.T) {
 				// Version and Language not provided - should use defaults
 			},
 			setup: func(m *executor.MockExecutor, tempDir string) {
-				os.MkdirAll(filepath.Join(tempDir, "chaincode"), 0755)
+				if err := os.MkdirAll(filepath.Join(tempDir, "chaincode"), 0755); err != nil {
+					t.Fatal(err)
+				}
 
 				m.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 					if contains(args, "package") {
 						pkgPath := filepath.Join(tempDir, "chaincode", "mycc.tar.gz")
-						os.WriteFile(pkgPath, []byte("dummy"), 0644)
+						if err := os.WriteFile(pkgPath, []byte("dummy"), 0644); err != nil {
+							t.Fatal(err)
+						}
 						return []byte("Packaged"), nil
 					}
 					if contains(args, "queryinstalled") {
@@ -573,7 +580,7 @@ func BenchmarkDeploy(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		deployer.Deploy(ctx, req)
+		_, _ = deployer.Deploy(ctx, req)
 	}
 }
 
@@ -592,6 +599,6 @@ func BenchmarkInvoke(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		invoker.Invoke(ctx, "mycc", "invoke", []string{"arg1"})
+		_, _, _ = invoker.Invoke(ctx, "mycc", "invoke", []string{"arg1"})
 	}
 }

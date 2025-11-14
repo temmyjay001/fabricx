@@ -9,12 +9,11 @@
 package grpcserver
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -1127,7 +1126,7 @@ const file_protos_fabricx_proto_rawDesc = "" +
 	"\vStopNetwork\x12\x1b.fabricx.StopNetworkRequest\x1a\x1c.fabricx.StopNetworkResponse\x12Q\n" +
 	"\x10GetNetworkStatus\x12\x1d.fabricx.NetworkStatusRequest\x1a\x1e.fabricx.NetworkStatusResponse\x12?\n" +
 	"\n" +
-	"StreamLogs\x12\x1a.fabricx.StreamLogsRequest\x1a\x13.fabricx.LogMessage0\x01B4Z2github.com/temmyjay001/core/pkg/grpcserverb\x06proto3"
+	"StreamLogs\x12\x1a.fabricx.StreamLogsRequest\x1a\x13.fabricx.LogMessage0\x01B,Z*github.com/temmyjay001/core/pkg/grpcserverb\x06proto3"
 
 var (
 	file_protos_fabricx_proto_rawDescOnce sync.Once

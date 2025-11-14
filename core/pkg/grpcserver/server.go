@@ -83,7 +83,9 @@ func (s *FabricXServer) InitNetwork(ctx context.Context, req *InitNetworkRequest
 	// Wait for network readiness with context
 	if err := net.WaitForReady(ctx); err != nil {
 		// Clean up on failure
-		s.dockerMgr.StopNetwork(ctx, net, true)
+		if stopErr := s.dockerMgr.StopNetwork(ctx, net, true); stopErr != nil {
+			log.Printf("Warning: failed to stop network on readiness error: %v", stopErr)
+		}
 		s.networksMu.Lock()
 		delete(s.networks, net.ID)
 		s.networksMu.Unlock()

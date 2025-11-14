@@ -159,7 +159,9 @@ func TestBootstrapContextCancellation(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error due to context cancellation")
 		if net != nil {
-			net.Cleanup()
+			if err := net.Cleanup(); err != nil {
+				t.Errorf("Cleanup failed: %v", err)
+			}
 		}
 	}
 
@@ -533,7 +535,9 @@ func BenchmarkBootstrap(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		net.Cleanup()
+		if err := net.Cleanup(); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
