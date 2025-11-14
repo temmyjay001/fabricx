@@ -1,4 +1,4 @@
-// fabricx-core/pkg/chaincode/deployer_test.go
+// core/pkg/chaincode/deployer_test.go
 package chaincode
 
 import (
@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/temmyjay001/fabricx-core/pkg/docker"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
-	"github.com/temmyjay001/fabricx-core/pkg/network"
+	"github.com/temmyjay001/core/pkg/docker"
+	"github.com/temmyjay001/core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/network"
 )
 
 func createMockNetwork() *network.Network {

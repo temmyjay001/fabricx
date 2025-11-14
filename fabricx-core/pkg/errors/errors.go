@@ -1,4 +1,4 @@
-// fabricx-core/pkg/errors/errors.go
+// core/pkg/errors/errors.go
 package errors
 
 import (
@@ -10,36 +10,36 @@ import (
 var (
 	// ErrBinaryMissing is returned when a required binary is not found
 	ErrBinaryMissing = errors.New("required binary not found")
-	
+
 	// ErrTimeout is returned when an operation times out
 	ErrTimeout = errors.New("operation timeout")
-	
+
 	// ErrNetworkNotFound is returned when a network ID doesn't exist
 	ErrNetworkNotFound = errors.New("network not found")
-	
+
 	// ErrDockerUnavailable is returned when Docker is not available
 	ErrDockerUnavailable = errors.New("docker is not available")
-	
+
 	// ErrContainerFailed is returned when a container operation fails
 	ErrContainerFailed = errors.New("container operation failed")
-	
+
 	// ErrCryptoGenFailed is returned when crypto generation fails
 	ErrCryptoGenFailed = errors.New("crypto generation failed")
-	
+
 	// ErrChaincodeDeployFailed is returned when chaincode deployment fails
 	ErrChaincodeDeployFailed = errors.New("chaincode deployment failed")
-	
+
 	// ErrTransactionFailed is returned when a transaction fails
 	ErrTransactionFailed = errors.New("transaction failed")
-	
+
 	// ErrInvalidConfig is returned when configuration is invalid
 	ErrInvalidConfig = errors.New("invalid configuration")
 )
 
 // FabricXError wraps errors with additional context
 type FabricXError struct {
-	Op      string // Operation that failed
-	Err     error  // Underlying error
+	Op      string                 // Operation that failed
+	Err     error                  // Underlying error
 	Context map[string]interface{} // Additional context
 }
 
@@ -67,11 +67,11 @@ func NewError(op string, err error, context ...map[string]interface{}) *FabricXE
 		Op:  op,
 		Err: err,
 	}
-	
+
 	if len(context) > 0 {
 		e.Context = context[0]
 	}
-	
+
 	return e
 }
 

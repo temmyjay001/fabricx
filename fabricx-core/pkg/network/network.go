@@ -1,4 +1,4 @@
-// fabricx-core/pkg/network/network.go
+// core/pkg/network/network.go
 package network
 
 import (
@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/executor"
 )
 
 type Config struct {
@@ -135,7 +135,7 @@ func Bootstrap(ctx context.Context, config *Config, exec executor.Executor) (*Ne
 		return nil, errors.Wrap("Bootstrap.GenerateConfigTx", err)
 	}
 
-	if err:= generateCoreYAML(net); err != nil {
+	if err := generateCoreYAML(net); err != nil {
 		net.Cleanup()
 		return nil, errors.Wrap("Bootstrap.GenerateCoreYAML", err)
 	}
@@ -261,7 +261,7 @@ func (n *Network) checkReadiness(ctx context.Context) bool {
 	}
 
 	// Check if orderer is responsive
-	output, err := n.exec.ExecuteCombined(ctx, "docker", "exec", n.Orderers[0].Name, 
+	output, err := n.exec.ExecuteCombined(ctx, "docker", "exec", n.Orderers[0].Name,
 		"sh", "-c", "echo 'test' > /dev/null")
 	if err != nil {
 		return false

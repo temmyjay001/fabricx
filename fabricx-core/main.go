@@ -11,9 +11,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/temmyjay001/fabricx-core/pkg/docker"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
-	"github.com/temmyjay001/fabricx-core/pkg/grpcserver"
+	"github.com/temmyjay001/core/pkg/docker"
+	"github.com/temmyjay001/core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/grpcserver"
 	"google.golang.org/grpc"
 )
 

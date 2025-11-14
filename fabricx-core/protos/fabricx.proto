@@ -3,7 +3,7 @@ syntax = "proto3";
 
 package fabricx;
 
-option go_package = "github.com/temmyjay001/fabricx-core/pkg/grpcserver";
+option go_package = "github.com/temmyjay001/core/pkg/grpcserver";
 
 service FabricXService {
   rpc InitNetwork(InitNetworkRequest) returns (InitNetworkResponse);

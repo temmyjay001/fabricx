@@ -1,4 +1,4 @@
-// fabricx-core/pkg/docker/manager_test.go
+// core/pkg/docker/manager_test.go
 package docker
 
 import (
@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/executor"
 )
 
 // MockNetwork implements types.Network for testing

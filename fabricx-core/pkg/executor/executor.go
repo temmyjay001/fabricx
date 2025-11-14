@@ -1,4 +1,4 @@
-// fabricx-core/pkg/executor/executor.go
+// core/pkg/executor/executor.go
 package executor
 
 import (
@@ -11,10 +11,10 @@ import (
 type Executor interface {
 	// Execute runs a command with the given context and returns output and error
 	Execute(ctx context.Context, name string, args ...string) ([]byte, error)
-	
+
 	// ExecuteCombined runs a command and returns combined stdout/stderr
 	ExecuteCombined(ctx context.Context, name string, args ...string) ([]byte, error)
-	
+
 	// ExecuteStream runs a command and returns separate stdout/stderr channels
 	ExecuteStream(ctx context.Context, name string, args ...string) (<-chan string, <-chan error, error)
 }
@@ -42,28 +42,28 @@ func (e *RealExecutor) ExecuteCombined(ctx context.Context, name string, args ..
 // ExecuteStream runs a command and streams output
 func (e *RealExecutor) ExecuteStream(ctx context.Context, name string, args ...string) (<-chan string, <-chan error, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
-	
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, nil, err
 	}
-	
+
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return nil, nil, err
 	}
-	
+
 	if err := cmd.Start(); err != nil {
 		return nil, nil, err
 	}
-	
+
 	outChan := make(chan string, 100)
 	errChan := make(chan error, 1)
-	
+
 	go func() {
 		defer close(outChan)
 		defer close(errChan)
-		
+
 		// Stream stdout
 		go func() {
 			buf := make([]byte, 1024)
@@ -81,7 +81,7 @@ func (e *RealExecutor) ExecuteStream(ctx context.Context, name string, args ...s
 				}
 			}
 		}()
-		
+
 		// Stream stderr
 		go func() {
 			buf := make([]byte, 1024)
@@ -99,13 +99,13 @@ func (e *RealExecutor) ExecuteStream(ctx context.Context, name string, args ...s
 				}
 			}
 		}()
-		
+
 		// Wait for command to complete
 		if err := cmd.Wait(); err != nil {
 			errChan <- err
 		}
 	}()
-	
+
 	return outChan, errChan, nil
 }
 
@@ -114,7 +114,7 @@ type MockExecutor struct {
 	ExecuteFunc         func(ctx context.Context, name string, args ...string) ([]byte, error)
 	ExecuteCombinedFunc func(ctx context.Context, name string, args ...string) ([]byte, error)
 	ExecuteStreamFunc   func(ctx context.Context, name string, args ...string) (<-chan string, <-chan error, error)
-	
+
 	// Recording for verification
 	Calls []Call
 }
@@ -135,42 +135,42 @@ func NewMockExecutor() *MockExecutor {
 // Execute mocks command execution
 func (m *MockExecutor) Execute(ctx context.Context, name string, args ...string) ([]byte, error) {
 	m.Calls = append(m.Calls, Call{Name: name, Args: args})
-	
+
 	if m.ExecuteFunc != nil {
 		return m.ExecuteFunc(ctx, name, args...)
 	}
-	
+
 	return []byte("mock output"), nil
 }
 
 // ExecuteCombined mocks combined output execution
 func (m *MockExecutor) ExecuteCombined(ctx context.Context, name string, args ...string) ([]byte, error) {
 	m.Calls = append(m.Calls, Call{Name: name, Args: args})
-	
+
 	if m.ExecuteCombinedFunc != nil {
 		return m.ExecuteCombinedFunc(ctx, name, args...)
 	}
-	
+
 	return []byte("mock output"), nil
 }
 
 // ExecuteStream mocks streaming execution
 func (m *MockExecutor) ExecuteStream(ctx context.Context, name string, args ...string) (<-chan string, <-chan error, error) {
 	m.Calls = append(m.Calls, Call{Name: name, Args: args})
-	
+
 	if m.ExecuteStreamFunc != nil {
 		return m.ExecuteStreamFunc(ctx, name, args...)
 	}
-	
+
 	outChan := make(chan string, 1)
 	errChan := make(chan error, 1)
-	
+
 	go func() {
 		outChan <- "mock log output"
 		close(outChan)
 		close(errChan)
 	}()
-	
+
 	return outChan, errChan, nil
 }
 

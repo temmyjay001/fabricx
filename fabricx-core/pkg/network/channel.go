@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/errors"
 )
 
 // CreateChannel creates the channel using the CLI container

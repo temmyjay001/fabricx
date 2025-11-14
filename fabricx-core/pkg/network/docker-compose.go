@@ -6,7 +6,7 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/temmyjay001/fabricx-core/pkg/utils"
+	"github.com/temmyjay001/core/pkg/utils"
 )
 
 func generateDockerCompose(net *Network) error {

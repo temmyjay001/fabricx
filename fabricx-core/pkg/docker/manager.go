@@ -1,4 +1,4 @@
-// fabricx-core/pkg/docker/manager.go
+// core/pkg/docker/manager.go
 package docker
 
 import (
@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
-	"github.com/temmyjay001/fabricx-core/pkg/types"
+	"github.com/temmyjay001/core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/types"
 )
 
 type Manager struct {

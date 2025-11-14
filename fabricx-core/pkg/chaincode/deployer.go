@@ -1,4 +1,4 @@
-// fabricx-core/pkg/chaincode/deployer.go
+// core/pkg/chaincode/deployer.go
 package chaincode
 
 import (
@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/temmyjay001/fabricx-core/pkg/docker"
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
-	"github.com/temmyjay001/fabricx-core/pkg/network"
+	"github.com/temmyjay001/core/pkg/docker"
+	"github.com/temmyjay001/core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/network"
 )
 
 const (

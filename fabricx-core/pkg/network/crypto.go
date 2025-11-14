@@ -1,4 +1,4 @@
-// fabricx-core/pkg/network/crypto.go
+// core/pkg/network/crypto.go
 package network
 
 import (
@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
-	"github.com/temmyjay001/fabricx-core/pkg/utils"
+	"github.com/temmyjay001/core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/utils"
 )
 
 const (

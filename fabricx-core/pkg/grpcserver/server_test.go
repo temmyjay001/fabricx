@@ -1,4 +1,4 @@
-// fabricx-core/tests/integration/full_lifecycle_test.go
+// core/tests/integration/full_lifecycle_test.go
 //go:build integration
 // +build integration
 
@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/temmyjay001/fabricx-core/pkg/chaincode"
-	"github.com/temmyjay001/fabricx-core/pkg/docker"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
-	"github.com/temmyjay001/fabricx-core/pkg/network"
+	"github.com/temmyjay001/core/pkg/chaincode"
+	"github.com/temmyjay001/core/pkg/docker"
+	"github.com/temmyjay001/core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/network"
 )
 
 // TestFullLifecycle tests the complete workflow from network creation to transaction execution
@@ -77,7 +77,7 @@ func TestFullLifecycle(t *testing.T) {
 
 	// Step 5: Deploy test chaincode
 	t.Log("Step 5: Deploying test chaincode...")
-	
+
 	// Create a simple test chaincode
 	chaincodeDir := filepath.Join(net.BasePath, "test-chaincode")
 	if err := os.MkdirAll(chaincodeDir, 0755); err != nil {
@@ -93,9 +93,9 @@ func TestFullLifecycle(t *testing.T) {
 
 	deployer := chaincode.NewDeployer(net, dockerMgr, executor.NewRealExecutor())
 	ccID, err := deployer.Deploy(ctx, &chaincode.DeployRequest{
-		Name:    "testcc",
-		Path:    chaincodeDir,
-		Version: "1.0",
+		Name:     "testcc",
+		Path:     chaincodeDir,
+		Version:  "1.0",
 		Language: "golang",
 	})
 	if err != nil {
@@ -117,7 +117,7 @@ func TestFullLifecycle(t *testing.T) {
 
 	// Step 7: Query ledger
 	t.Log("Step 7: Querying ledger...")
-	
+
 	result, err := invoker.Query(ctx, "testcc", "GetAllAssets", []string{})
 	if err != nil {
 		t.Fatalf("Failed to query ledger: %v", err)

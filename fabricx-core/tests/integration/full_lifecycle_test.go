@@ -1,17 +1,19 @@
-// fabricx-core/tests/integration/full_lifecycle_test.go
+// core/tests/integration/full_lifecycle_test.go
+//go:build integration
 // +build integration
 
 package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/temmyjay001/fabricx-core/pkg/chaincode"
-	"github.com/temmyjay001/fabricx-core/pkg/docker"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
-	"github.com/temmyjay001/fabricx-core/pkg/network"
+	"github.com/temmyjay001/core/pkg/chaincode"
+	"github.com/temmyjay001/core/pkg/docker"
+	"github.com/temmyjay001/core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/network"
 )
 
 // TestFullLifecycle tests the complete workflow from network creation to transaction execution
@@ -175,7 +177,7 @@ func TestMockFullLifecycle(t *testing.T) {
 
 	// Step 5: Query ledger (mocked)
 	t.Log("Step 5: Querying ledger (mocked)...")
-	
+
 	// Mock query response
 	mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		return []byte(`{"id":"asset1","value":"value1"}`), nil
@@ -238,7 +240,7 @@ func TestLifecycleWithErrors(t *testing.T) {
 
 	t.Run("container start fails", func(t *testing.T) {
 		mockExec := executor.NewMockExecutor()
-		
+
 		// First call succeeds (bootstrap), second fails (container start)
 		callCount := 0
 		mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
@@ -337,7 +339,7 @@ func TestLifecycleContextCancellation(t *testing.T) {
 
 	t.Run("cancel during deployment", func(t *testing.T) {
 		mockExec := executor.NewMockExecutor()
-		
+
 		// Bootstrap succeeds quickly
 		bootstrapDone := false
 		mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
@@ -345,7 +347,7 @@ func TestLifecycleContextCancellation(t *testing.T) {
 				return []byte("success"), nil
 			}
 			bootstrapDone = true
-			
+
 			// Deployment is slow
 			select {
 			case <-time.After(5 * time.Second):

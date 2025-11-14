@@ -1,4 +1,4 @@
-// fabricx-core/pkg/grpcserver/server.go
+// core/pkg/grpcserver/server.go
 package grpcserver
 
 import (
@@ -7,11 +7,11 @@ import (
 	"log"
 	"sync"
 
-	"github.com/temmyjay001/fabricx-core/pkg/chaincode"
-	"github.com/temmyjay001/fabricx-core/pkg/docker"
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
-	"github.com/temmyjay001/fabricx-core/pkg/network"
+	"github.com/temmyjay001/core/pkg/chaincode"
+	"github.com/temmyjay001/core/pkg/docker"
+	"github.com/temmyjay001/core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/network"
 )
 
 type FabricXServer struct {
@@ -73,7 +73,7 @@ func (s *FabricXServer) InitNetwork(ctx context.Context, req *InitNetworkRequest
 		s.networksMu.Lock()
 		delete(s.networks, net.ID)
 		s.networksMu.Unlock()
-		
+
 		return &InitNetworkResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to start containers: %v", err),
@@ -87,7 +87,7 @@ func (s *FabricXServer) InitNetwork(ctx context.Context, req *InitNetworkRequest
 		s.networksMu.Lock()
 		delete(s.networks, net.ID)
 		s.networksMu.Unlock()
-		
+
 		return &InitNetworkResponse{
 			Success: false,
 			Message: fmt.Sprintf("Network failed to become ready: %v", err),
@@ -410,10 +410,10 @@ func (s *FabricXServer) StreamLogs(req *StreamLogsRequest, stream FabricXService
 // Shutdown gracefully shuts down the server
 func (s *FabricXServer) Shutdown(ctx context.Context) error {
 	log.Println("Shutting down FabricX server...")
-	
+
 	s.networksMu.Lock()
 	defer s.networksMu.Unlock()
-	
+
 	// Stop all running networks
 	for id, net := range s.networks {
 		log.Printf("Stopping network %s", id)
@@ -421,9 +421,9 @@ func (s *FabricXServer) Shutdown(ctx context.Context) error {
 			log.Printf("Error stopping network %s: %v", id, err)
 		}
 	}
-	
+
 	s.networks = make(map[string]*network.Network)
 	log.Println("FabricX server shutdown complete")
-	
+
 	return nil
 }

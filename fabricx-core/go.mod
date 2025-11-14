@@ -1,5 +1,5 @@
 // go.mod
-module github.com/temmyjay001/fabricx-core
+module github.com/temmyjay001/core
 
 go 1.25.3
 

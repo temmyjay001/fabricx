@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/temmyjay001/fabricx-core/pkg/grpcserver"
+	pb "github.com/temmyjay001/core/pkg/grpcserver"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

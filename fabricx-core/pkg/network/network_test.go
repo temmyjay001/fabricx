@@ -1,4 +1,4 @@
-// fabricx-core/pkg/network/network_test.go
+// core/pkg/network/network_test.go
 package network
 
 import (
@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/executor"
 )
 
 func TestBootstrap(t *testing.T) {
@@ -293,7 +293,7 @@ func TestWaitForReady(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockExec := executor.NewMockExecutor()
-			
+
 			net := &Network{
 				ID:   "test-net-123",
 				Name: "test-network",

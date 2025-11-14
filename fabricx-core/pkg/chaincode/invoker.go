@@ -1,4 +1,4 @@
-// fabricx-core/pkg/chaincode/invoker.go
+// core/pkg/chaincode/invoker.go
 package chaincode
 
 import (
@@ -8,9 +8,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/temmyjay001/fabricx-core/pkg/errors"
-	"github.com/temmyjay001/fabricx-core/pkg/executor"
-	"github.com/temmyjay001/fabricx-core/pkg/network"
+	"github.com/temmyjay001/core/pkg/errors"
+	"github.com/temmyjay001/core/pkg/executor"
+	"github.com/temmyjay001/core/pkg/network"
 )
 
 type Invoker struct {
@@ -77,7 +77,7 @@ func (inv *Invoker) Invoke(ctx context.Context, chaincodeName, functionName stri
 
 	// Clean up the output - remove ANSI codes and extract payload if present
 	cleanOutput := inv.cleanOutput(string(output))
-	
+
 	// Try to extract result payload from the output
 	payload := inv.extractPayload(cleanOutput)
 
@@ -122,7 +122,7 @@ func (inv *Invoker) Query(ctx context.Context, chaincodeName, functionName strin
 
 	// Clean the output
 	cleanOutput := inv.cleanOutput(string(output))
-	
+
 	// For queries, the last line typically contains the result
 	lines := strings.Split(strings.TrimSpace(cleanOutput), "\n")
 	if len(lines) > 0 {
@@ -234,7 +234,7 @@ func (inv *Invoker) cleanOutput(output string) string {
 	// Remove ANSI escape codes (color codes)
 	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	cleaned := ansiRegex.ReplaceAllString(output, "")
-	
+
 	// Remove timestamp prefixes like "2025-11-11 02:52:58.506 UTC 0001 INFO"
 	timestampRegex := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d+\s+UTC\s+\d+\s+INFO\s+`)
 	lines := strings.Split(cleaned, "\n")
@@ -245,7 +245,7 @@ func (inv *Invoker) cleanOutput(output string) string {
 			cleanedLines = append(cleanedLines, line)
 		}
 	}
-	
+
 	return strings.Join(cleanedLines, "\n")
 }
 
@@ -254,29 +254,29 @@ func (inv *Invoker) extractPayload(output string) []byte {
 	// Look for "result: status:200 payload:..." pattern
 	re := regexp.MustCompile(`result:\s*status:(\d+)\s+(?:payload:"?([^"]*)"?)?`)
 	matches := re.FindStringSubmatch(output)
-	
+
 	if len(matches) > 2 && matches[2] != "" {
 		// Found payload
 		return []byte(matches[2])
 	}
-	
+
 	// Look for lines that might contain chaincode response
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		// Skip lines that are clearly log messages
-		if strings.Contains(line, "INFO") || 
-		   strings.Contains(line, "ClientWait") || 
-		   strings.Contains(line, "committed with status") {
+		if strings.Contains(line, "INFO") ||
+			strings.Contains(line, "ClientWait") ||
+			strings.Contains(line, "committed with status") {
 			continue
 		}
-		
+
 		// If line looks like JSON, return it
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
 			return []byte(trimmed)
 		}
 	}
-	
+
 	// Return empty if no payload found (for transactions that don't return data)
 	return []byte{}
 }
