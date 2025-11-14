@@ -348,7 +348,7 @@ func streamLogs(client pb.FabricXServiceClient) {
 	if containerName != "" {
 		fmt.Printf(" (container: %s)", containerName)
 	}
-	fmt.Println("\n   Press Ctrl+C to stop\n")
+	fmt.Println("\n   Press Ctrl+C to stop")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

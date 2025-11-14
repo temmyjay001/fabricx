@@ -95,13 +95,24 @@ func generateOrdererService(net *Network, orderer *Orderer) map[string]interface
 			fmt.Sprintf("ORDERER_GENERAL_LISTENPORT=%d", orderer.Port),
 			"ORDERER_GENERAL_LOCALMSPID=OrdererMSP",
 			"ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp",
-			"ORDERER_GENERAL_TLS_ENABLED=false",
+			
+			// TLS ENABLED
+			"ORDERER_GENERAL_TLS_ENABLED=true",
+			"ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key",
+			"ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt",
+			"ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]",
+			
+			// Client auth for mutual TLS
+			"ORDERER_GENERAL_TLS_CLIENTAUTHREQUIRED=false",
+			"ORDERER_GENERAL_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]",
+			
 			"ORDERER_GENERAL_GENESISMETHOD=file",
 			"ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/orderer.genesis.block",
 			"ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt",
 			"ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key",
 			"ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]",
 			"ORDERER_OPERATIONS_LISTENADDRESS=0.0.0.0:8443",
+			"ORDERER_METRICS_PROVIDER=prometheus",
 		},
 		"working_dir": "/opt/gopath/src/github.com/hyperledger/fabric",
 		"command":     "orderer",
@@ -157,10 +168,20 @@ func generatePeerService(net *Network, org *Organization, peer *Peer, index int,
 			fmt.Sprintf("CORE_PEER_GOSSIP_EXTERNALENDPOINT=%s:%d", peer.Name, peer.Port),
 			fmt.Sprintf("CORE_PEER_GOSSIP_BOOTSTRAP=%s:%d", peer.Name, peer.Port),
 			fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
-			// fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/users/Admin@%s/msp", org.Domain),
 			"CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp",
-			"CORE_PEER_TLS_ENABLED=false",
+			
+			// TLS ENABLED
+			"CORE_PEER_TLS_ENABLED=true",
+			"CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt",
+			"CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key",
+			"CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt",
+			
+			// Client auth for mutual TLS
+			"CORE_PEER_TLS_CLIENTAUTHREQUIRED=false",
+			"CORE_PEER_TLS_CLIENTROOTCAS_FILES=/etc/hyperledger/fabric/tls/ca.crt",
+			
 			"CORE_OPERATIONS_LISTENADDRESS=0.0.0.0:9443",
+			"CORE_METRICS_PROVIDER=prometheus",
 		},
 		"working_dir": "/opt/gopath/src/github.com/hyperledger/fabric/peer",
 		"command":     "peer node start",
@@ -343,14 +364,16 @@ func generateCLIService(net *Network) map[string]interface{} {
 		fmt.Sprintf("%s:/etc/hyperledger/fabric/crypto", net.CryptoPath),
 	}
 
-	log.Println(volumes)
-
 	// Mount all org MSPs so CLI can switch between orgs
 	for _, o := range net.Orgs {
 		volumes = append(volumes,
 			fmt.Sprintf("%s/peerOrganizations/%s/users:/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users",
 				net.CryptoPath, o.Domain, o.Domain))
 	}
+
+	volumes = append(volumes,
+		fmt.Sprintf("%s/ordererOrganizations/example.com/orderers/orderer.example.com/tls:/etc/hyperledger/fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls",
+			net.CryptoPath))
 
 	return map[string]interface{}{
 		"container_name": "cli",
@@ -364,7 +387,12 @@ func generateCLIService(net *Network) map[string]interface{} {
 			fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
 			fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", org.Peers[0].Name, org.Peers[0].Port),
 			fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
-			"CORE_PEER_TLS_ENABLED=false",
+			
+			// TLS ENABLED
+			"CORE_PEER_TLS_ENABLED=true",
+			fmt.Sprintf("CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/server.crt", org.Domain, org.Peers[0].Name),
+			fmt.Sprintf("CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/server.key", org.Domain, org.Peers[0].Name),
+			fmt.Sprintf("CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", org.Domain, org.Peers[0].Name),
 		},
 		"working_dir": "/opt/gopath/src/github.com/hyperledger/fabric/peer",
 		"command":     "/bin/bash",

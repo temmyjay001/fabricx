@@ -9,6 +9,8 @@ import (
 	"github.com/temmyjay001/core/pkg/errors"
 )
 
+const ordererTLSCA = "/etc/hyperledger/fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt"
+
 // CreateChannel creates the channel using the CLI container
 func (n *Network) CreateChannel(ctx context.Context) error {
 	fmt.Println("📢 Creating channel...")
@@ -28,7 +30,10 @@ func (n *Network) CreateChannel(ctx context.Context) error {
 		"-e", fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
 		"-e", fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", org.Peers[0].Name, org.Peers[0].Port),
 		"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
-		"-e", "CORE_PEER_TLS_ENABLED=false",
+
+		// TLS ENABLED
+		"-e", "CORE_PEER_TLS_ENABLED=true",
+		"-e", fmt.Sprintf("CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", org.Domain, org.Peers[0].Name),
 	}
 
 	args := []string{"exec"}
@@ -39,6 +44,8 @@ func (n *Network) CreateChannel(ctx context.Context) error {
 		"-c", n.Channel.Name,
 		"-f", channelTxFile,
 		"--outputBlock", fmt.Sprintf("/etc/hyperledger/fabric/config/%s.block", n.Channel.Name),
+		"--tls", "true",
+		"--cafile", ordererTLSCA,
 	)
 
 	output, err := n.exec.ExecuteCombined(ctx, "docker", args...)
@@ -76,7 +83,8 @@ func (n *Network) JoinPeersToChannel(ctx context.Context) error {
 				"-e", fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
 				"-e", fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", peer.Name, peer.Port),
 				"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
-				"-e", "CORE_PEER_TLS_ENABLED=false",
+				"-e", "CORE_PEER_TLS_ENABLED=true",
+				"-e", fmt.Sprintf("CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", org.Domain, peer.Name),
 				"cli",
 				"peer", "channel", "join",
 				"-b", fmt.Sprintf("/etc/hyperledger/fabric/config/%s.block", n.Channel.Name),
@@ -147,7 +155,8 @@ func (n *Network) UpdateAnchorPeers(ctx context.Context) error {
 			"-e", fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
 			"-e", fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", org.Peers[0].Name, org.Peers[0].Port),
 			"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
-			"-e", "CORE_PEER_TLS_ENABLED=false",
+			"-e", "CORE_PEER_TLS_ENABLED=true",
+			"-e", fmt.Sprintf("CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", org.Domain, org.Peers[0].Name),
 		}
 
 		args := []string{"exec"}
@@ -157,6 +166,8 @@ func (n *Network) UpdateAnchorPeers(ctx context.Context) error {
 			"-o", fmt.Sprintf("%s:%d", n.Orderers[0].Name, n.Orderers[0].Port),
 			"-c", n.Channel.Name,
 			"-f", anchorTxFile,
+			"--tls", "true",
+			"--cafile", ordererTLSCA,
 		)
 
 		output, err = n.exec.ExecuteCombined(ctx, "docker", args...)

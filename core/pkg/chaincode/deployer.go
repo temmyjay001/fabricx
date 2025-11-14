@@ -4,6 +4,7 @@ package chaincode
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -16,6 +17,7 @@ import (
 
 const (
 	fabricToolsImage = "hyperledger/fabric-tools:2.5"
+	ordererTLSCA     = "/etc/hyperledger/fabric/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt"
 )
 
 type Deployer struct {
@@ -111,43 +113,23 @@ func (d *Deployer) Deploy(ctx context.Context, req *DeployRequest) (string, erro
 }
 
 func (d *Deployer) packageChaincode(ctx context.Context, req *DeployRequest) (string, error) {
-	packagePath := filepath.Join(d.network.BasePath, "chaincode", fmt.Sprintf("%s.tar.gz", req.Name))
-
-	// Check context
-	if err := ctx.Err(); err != nil {
-		return "", errors.Wrap("packageChaincode", err)
-	}
-
-	// Convert to absolute paths
-	absChaincodePath, err := filepath.Abs(req.Path)
+	// Create a temporary directory for packaging
+	tempDir, err := os.MkdirTemp("", "fabricx-package-")
 	if err != nil {
-		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
-			"path": req.Path,
-		})
+		return "", errors.Wrap("packageChaincode.TempDir", err)
 	}
+	defer os.RemoveAll(tempDir)
 
-	absPackagePath, err := filepath.Abs(packagePath)
-	if err != nil {
-		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
-			"path": packagePath,
-		})
-	}
+	packagePath := filepath.Join(tempDir, fmt.Sprintf("%s.tar.gz", req.Name))
 
-	// Ensure output directory exists
-	packageDir := filepath.Dir(absPackagePath)
-	if _, err := d.exec.ExecuteCombined(ctx, "mkdir", "-p", packageDir); err != nil {
-		return "", errors.WrapWithContext("packageChaincode", err, map[string]interface{}{
-			"dir": packageDir,
-		})
-	}
-
-	fmt.Printf("📦 Packaging chaincode from: %s\n", absChaincodePath)
-	fmt.Printf("   Output: %s\n", absPackagePath)
+	fmt.Printf("📦 Packaging chaincode from: %s\n", req.Path)
+	fmt.Printf("   Output: %s\n", packagePath)
 
 	// Run peer lifecycle chaincode package inside Docker
+	// We mount the chaincode path and the output path
 	output, err := d.exec.ExecuteCombined(ctx, "docker", "run", "--rm",
-		"-v", fmt.Sprintf("%s:/chaincode", absChaincodePath),
-		"-v", fmt.Sprintf("%s:/output", packageDir),
+		"-v", fmt.Sprintf("%s:/chaincode", req.Path),
+		"-v", fmt.Sprintf("%s:/output", tempDir),
 		fabricToolsImage,
 		"peer", "lifecycle", "chaincode", "package",
 		fmt.Sprintf("/output/%s.tar.gz", req.Name),
@@ -164,7 +146,7 @@ func (d *Deployer) packageChaincode(ctx context.Context, req *DeployRequest) (st
 	}
 
 	fmt.Printf("✓ Chaincode packaged successfully\n")
-	return absPackagePath, nil
+	return packagePath, nil
 }
 
 func (d *Deployer) installChaincode(ctx context.Context, org *network.Organization, peer *network.Peer, packageFile string) error {
@@ -220,7 +202,7 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 	}
 
 	peer := org.Peers[0]
-	// containerName := peer.Name
+	containerName := "cli"
 
 	// Build endorsement policy
 	policy := d.buildEndorsementPolicy(req.EndorsementPolicyOrgs)
@@ -229,7 +211,7 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 
 	args := []string{"exec"}
 	args = append(args, env...)
-	args = append(args, "cli",
+	args = append(args, containerName,
 		"peer", "lifecycle", "chaincode", "approveformyorg",
 		"-o", fmt.Sprintf("%s:%d", d.network.Orderers[0].Name, d.network.Orderers[0].Port),
 		"--channelID", d.network.Channel.Name,
@@ -238,6 +220,8 @@ func (d *Deployer) approveChaincode(ctx context.Context, org *network.Organizati
 		"--package-id", packageID,
 		"--sequence", "1",
 		"--signature-policy", policy,
+		"--tls", "true",
+		"--cafile", ordererTLSCA,
 	)
 
 	output, err := d.exec.ExecuteCombined(ctx, "docker", args...)
@@ -268,9 +252,13 @@ func (d *Deployer) commitChaincode(ctx context.Context, req *DeployRequest) erro
 
 	// Build peer addresses
 	peerAddresses := []string{}
-	for _, org := range d.network.Orgs {
-		for _, peer := range org.Peers {
-			peerAddresses = append(peerAddresses, "--peerAddresses", fmt.Sprintf("%s:%d", peer.Name, peer.Port))
+	peerTLSRootCerts := []string{}
+
+	for _, o := range d.network.Orgs {
+		for _, p := range o.Peers {
+			peerAddresses = append(peerAddresses, "--peerAddresses", fmt.Sprintf("%s:%d", p.Name, p.Port))
+			tlsCert := fmt.Sprintf("/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", o.Domain, p.Name)
+			peerTLSRootCerts = append(peerTLSRootCerts, "--tlsRootCertFiles", tlsCert)
 		}
 	}
 
@@ -288,8 +276,12 @@ func (d *Deployer) commitChaincode(ctx context.Context, req *DeployRequest) erro
 		"--version", req.Version,
 		"--sequence", "1",
 		"--signature-policy", policy,
+		"--tls", "true",
+		"--cafile", ordererTLSCA,
 	)
+
 	args = append(args, peerAddresses...)
+	args = append(args, peerTLSRootCerts...)
 
 	output, err := d.exec.ExecuteCombined(ctx, "docker", args...)
 	if err != nil {
@@ -314,6 +306,18 @@ func (d *Deployer) initChaincode(ctx context.Context, req *DeployRequest) error 
 	peer := org.Peers[0]
 	containerName := "cli"
 
+	// Build peer addresses
+	peerAddresses := []string{}
+	peerTLSRootCerts := []string{}
+
+	for _, o := range d.network.Orgs {
+		for _, p := range o.Peers {
+			peerAddresses = append(peerAddresses, "--peerAddresses", fmt.Sprintf("%s:%d", p.Name, p.Port))
+			tlsCert := fmt.Sprintf("/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", o.Domain, p.Name)
+			peerTLSRootCerts = append(peerTLSRootCerts, "--tlsRootCertFiles", tlsCert)
+		}
+	}
+
 	env := d.getPeerEnvArgs(org, peer)
 	args := []string{"exec"}
 	args = append(args, env...)
@@ -324,7 +328,12 @@ func (d *Deployer) initChaincode(ctx context.Context, req *DeployRequest) error 
 		"-n", req.Name,
 		"--isInit",
 		"-c", `{"Args":["Init"]}`,
+		"--tls", "true",
+		"--cafile", ordererTLSCA,
 	)
+
+	args = append(args, peerAddresses...)
+	args = append(args, peerTLSRootCerts...)
 
 	output, err := d.exec.ExecuteCombined(ctx, "docker", args...)
 	if err != nil {
@@ -348,7 +357,10 @@ func (d *Deployer) getPackageID(ctx context.Context, org *network.Organization, 
 	args := []string{"exec"}
 	args = append(args, env...)
 	args = append(args, containerName,
-		"peer", "lifecycle", "chaincode", "queryinstalled")
+		"peer", "lifecycle", "chaincode", "queryinstalled",
+		"--tls", "true",
+		"--cafile", ordererTLSCA,
+	)
 
 	output, err := d.exec.ExecuteCombined(ctx, "docker", args...)
 	if err != nil {
@@ -358,12 +370,13 @@ func (d *Deployer) getPackageID(ctx context.Context, org *network.Organization, 
 		})
 	}
 
-	// Parse output to find package ID
+	// The output looks like:
+	// Installed chaincodes on peer:
+	// Package ID: mycc_1.0:1234567890, Label: mycc_1.0
 	label := fmt.Sprintf("%s_%s", name, version)
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
-		if strings.Contains(line, label) {
-			// Extract package ID from line like: "Package ID: label:hash, Label: label"
+		if strings.Contains(line, "Package ID:") && strings.Contains(line, label) {
 			parts := strings.Split(line, ",")
 			if len(parts) > 0 {
 				idPart := strings.TrimSpace(parts[0])
@@ -374,8 +387,8 @@ func (d *Deployer) getPackageID(ctx context.Context, org *network.Organization, 
 		}
 	}
 
-	return "", errors.WrapWithContext("getPackageID", fmt.Errorf("package ID not found"), map[string]interface{}{
-		"label": label,
+	return "", errors.WrapWithContext("getPackageID", fmt.Errorf("package ID not found for label %s", label), map[string]interface{}{
+		"output": string(output),
 	})
 }
 
@@ -384,7 +397,10 @@ func (d *Deployer) getPeerEnvArgs(org *network.Organization, peer *network.Peer)
 		"-e", fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
 		"-e", fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", peer.Name, peer.Port),
 		"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
-		"-e", "CORE_PEER_TLS_ENABLED=false",
+		"-e", "CORE_PEER_TLS_ENABLED=true",
+		"-e", fmt.Sprintf("CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/server.crt", org.Domain, peer.Name),
+		"-e", fmt.Sprintf("CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/server.key", org.Domain, peer.Name),
+		"-e", fmt.Sprintf("CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", org.Domain, peer.Name),
 		"-e", "FABRIC_CFG_PATH=/etc/hyperledger/fabric/config",
 	}
 }

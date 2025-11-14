@@ -59,9 +59,15 @@ func generateCryptoConfig(net *Network) map[string]interface{} {
 			{
 				"Name":   "Orderer",
 				"Domain": "example.com",
+				"EnableNodeOUs": true,
 				"Specs": []map[string]interface{}{
 					{
 						"Hostname": "orderer",
+						"SANS": []string{
+							"localhost",
+							"orderer.example.com",
+							"127.0.0.1",
+						},
 					},
 				},
 			},
@@ -69,15 +75,26 @@ func generateCryptoConfig(net *Network) map[string]interface{} {
 		"PeerOrgs": []map[string]interface{}{},
 	}
 
-	// Add peer organizations
+	// Add peer organizations with TLS SANS
 	peerOrgs := []map[string]interface{}{}
 	for _, org := range net.Orgs {
+		sans := []string{
+			"localhost",
+			"127.0.0.1",
+		}
+		
+		// Add all peer hostnames as SANS
+		for _, peer := range org.Peers {
+			sans = append(sans, peer.Name)
+		}
+		
 		peerOrg := map[string]interface{}{
 			"Name":          org.Name,
 			"Domain":        org.Domain,
 			"EnableNodeOUs": true,
 			"Template": map[string]interface{}{
 				"Count": len(org.Peers),
+				"SANS":  sans,
 			},
 			"Users": map[string]interface{}{
 				"Count": 1,

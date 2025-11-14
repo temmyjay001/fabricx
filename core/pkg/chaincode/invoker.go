@@ -42,9 +42,12 @@ func (inv *Invoker) Invoke(ctx context.Context, chaincodeName, functionName stri
 
 	// Build peer addresses for endorsement
 	peerAddresses := []string{}
+	peerTLSRootCerts := []string{}
 	for _, org := range inv.network.Orgs {
 		for _, peer := range org.Peers {
 			peerAddresses = append(peerAddresses, "--peerAddresses", fmt.Sprintf("%s:%d", peer.Name, peer.Port))
+			tlsCert := fmt.Sprintf("/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", org.Domain, peer.Name)
+			peerTLSRootCerts = append(peerTLSRootCerts, "--tlsRootCertFiles", tlsCert)
 		}
 	}
 
@@ -59,8 +62,11 @@ func (inv *Invoker) Invoke(ctx context.Context, chaincodeName, functionName stri
 		"-n", chaincodeName,
 		"-c", argsJSON,
 		"--waitForEvent",
+		"--tls", "true",
+		"--cafile", ordererTLSCA,
 	)
 	cmdArgs = append(cmdArgs, peerAddresses...)
+	cmdArgs = append(cmdArgs, peerTLSRootCerts...)
 
 	output, err := inv.exec.ExecuteCombined(ctx, "docker", cmdArgs...)
 	if err != nil {
@@ -108,6 +114,8 @@ func (inv *Invoker) Query(ctx context.Context, chaincodeName, functionName strin
 		"-C", inv.network.Channel.Name,
 		"-n", chaincodeName,
 		"-c", argsJSON,
+		"--tls", "true",
+		"--cafile", ordererTLSCA,
 	)
 
 	output, err := inv.exec.ExecuteCombined(ctx, "docker", cmdArgs...)
@@ -196,7 +204,8 @@ func (inv *Invoker) getPeerEnvArgs(org *network.Organization, peer *network.Peer
 		"-e", fmt.Sprintf("CORE_PEER_LOCALMSPID=%s", org.MSPID),
 		"-e", fmt.Sprintf("CORE_PEER_ADDRESS=%s:%d", peer.Name, peer.Port),
 		"-e", fmt.Sprintf("CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/users/Admin@%s/msp", org.Domain, org.Domain),
-		"-e", "CORE_PEER_TLS_ENABLED=false",
+		"-e", "CORE_PEER_TLS_ENABLED=true",
+		"-e", fmt.Sprintf("CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/crypto/peerOrganizations/%s/peers/%s/tls/ca.crt", org.Domain, peer.Name),
 		"-e", "FABRIC_CFG_PATH=/etc/hyperledger/fabric/config",
 	}
 }
@@ -219,7 +228,7 @@ func (inv *Invoker) extractTxID(output string) string {
 	for _, line := range lines {
 		if strings.Contains(line, "txid") && strings.Contains(line, "committed") {
 			// Use regex to extract txid
-			re := regexp.MustCompile(`txid\s+\[([a-f0-9]+)\]`)
+			re := regexp.MustCompile(`txid\s+\[([a-zA-Z0-9]+)\]`)
 			matches := re.FindStringSubmatch(line)
 			if len(matches) > 1 {
 				return matches[1]

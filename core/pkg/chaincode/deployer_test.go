@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -336,7 +337,7 @@ func TestBuildEndorsementPolicy(t *testing.T) {
 }
 
 func containsStr(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || contains([]string{s}, substr))
+	return strings.Contains(s, substr)
 }
 
 func contains(slice []string, item string) bool {
