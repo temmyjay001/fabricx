@@ -31,7 +31,7 @@
     "grpc",
     "typescript"
   ],
-  "author": "FabricX Contributors",
+  "author": "Solomon Ajayi",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
