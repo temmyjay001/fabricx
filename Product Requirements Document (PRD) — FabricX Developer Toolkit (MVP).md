@@ -1,5 +1,3 @@
----
-
 # **🧩 Product Requirements Document (PRD) — FabricX Developer Toolkit (MVP)**
 
 ## **1\. Product Overview**
