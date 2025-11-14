@@ -112,7 +112,7 @@ export class ConnectionPool {
     }
 
     // Try to find an idle connection
-    for (const [id, conn] of this.pool.entries()) {
+    for (const [_, conn] of this.pool.entries()) {
       if (!conn.inUse) {
         conn.inUse = true;
         conn.lastUsed = new Date();
@@ -142,7 +142,7 @@ export class ConnectionPool {
    */
   release(client: GrpcClient): void {
     // Find the connection in the pool
-    for (const [id, conn] of this.pool.entries()) {
+    for (const [_, conn] of this.pool.entries()) {
       if (conn.client === client) {
         conn.inUse = false;
         conn.lastUsed = new Date();

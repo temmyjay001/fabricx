@@ -1,5 +1,5 @@
 // sdk/src/fabricx.ts
-import { GrpcClient, GrpcClientConfig } from './grpc/client';
+import { GrpcClient } from './grpc/client';
 import { ConnectionPool, ConnectionPoolConfig, PoolStats } from './grpc/connection-pool';
 import {
   InitNetworkOptions,
@@ -480,23 +480,6 @@ export class FabricX {
         }
       }
     });
-  }
-
-  /**
-   * Format payload for display
-   */
-  private formatPayload(payload?: Uint8Array): string {
-    if (!payload) {
-      return '';
-    }
-
-    try {
-      const str = new TextDecoder().decode(payload);
-      const json = JSON.parse(str);
-      return JSON.stringify(json, null, 2);
-    } catch {
-      return new TextDecoder().decode(payload);
-    }
   }
 }
 

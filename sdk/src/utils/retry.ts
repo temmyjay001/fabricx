@@ -325,16 +325,10 @@ export class CircuitBreaker {
   private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
   private readonly failureThreshold: number;
   private readonly resetTimeout: number;
-  private readonly halfOpenAttempts: number;
 
-  constructor(options?: {
-    failureThreshold?: number;
-    resetTimeout?: number;
-    halfOpenAttempts?: number;
-  }) {
+  constructor(options?: { failureThreshold?: number; resetTimeout?: number }) {
     this.failureThreshold = options?.failureThreshold || 5;
     this.resetTimeout = options?.resetTimeout || 60000; // 1 minute
-    this.halfOpenAttempts = options?.halfOpenAttempts || 1;
   }
 
   /**

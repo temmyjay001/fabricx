@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from 'fs';
-import { join, dirname } from 'path';
+import { join } from 'path';
 
 interface TemplateInfo {
   name: string;
