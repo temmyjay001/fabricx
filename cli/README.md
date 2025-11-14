@@ -648,5 +648,5 @@ Contributions welcome! Please read our contributing guidelines.
 ## 🔗 Links
 
 - [SDK Documentation](https://github.com/temmyjay001/fabricx/tree/main/sdk)
-- [Runtime Documentation](https://github.com/temmyjay001/fabricx/tree/main/fabricx-core)
+- [Runtime Documentation](https://github.com/temmyjay001/fabricx/tree/main/core)
 - [Examples](https://github.com/temmyjay001/fabricx/tree/main/examples)

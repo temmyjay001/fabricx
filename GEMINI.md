@@ -9,7 +9,7 @@ FabricX is a developer toolkit designed to simplify building on Hyperledger Fabr
 The project consists of three main components:
 1.  **A CLI (`fabricx`)** written in TypeScript for high-level commands.
 2.  **An SDK (`@fabricx/sdk`)** also in TypeScript, which provides a programmatic interface to the toolkit.
-3.  **A Go Runtime Core (`fabricx-core`)** that handles the low-level interactions with Hyperledger Fabric.
+3.  **A Go Runtime Core (`core`)** that handles the low-level interactions with Hyperledger Fabric.
 
 The TypeScript and Go components communicate via gRPC.
 
@@ -60,6 +60,6 @@ The project is not yet initialized. Based on the technical documentation, the fo
     /
     ├── cli/
     ├── sdk/
-    ├── fabricx-core/
+    ├── core/
     └── templates/
     ```

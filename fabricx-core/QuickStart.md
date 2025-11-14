@@ -27,7 +27,7 @@
 ## 📦 Project Structure
 
 ```
-fabricx-core/
+core/
 ├── main.go                          # Entry point
 ├── go.mod                           # Go dependencies
 ├── go.sum                           # Dependency checksums
@@ -59,8 +59,8 @@ fabricx-core/
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/fabricx-core
-cd fabricx-core
+git clone https://github.com/your-org/core
+cd core
 
 # Run the setup script
 chmod +x setup.sh
@@ -185,7 +185,7 @@ import (
     "log"
     "google.golang.org/grpc"
     "google.golang.org/grpc/credentials/insecure"
-    pb "fabricx-core/pkg/grpcserver"
+    pb "core/pkg/grpcserver"
 )
 
 func main() {
