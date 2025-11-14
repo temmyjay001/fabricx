@@ -73,12 +73,54 @@ func TestFullLifecycle(t *testing.T) {
 
 	t.Logf("✓ Network status: %s", status)
 
-	// Note: The following steps would require actual chaincode deployment
-	// For a complete integration test, you would:
-	// - Deploy a test chaincode
-	// - Invoke transactions
-	// - Query the ledger
-	// - Verify results
+	// Step 5: Deploy chaincode
+	t.Log("Step 5: Deploying chaincode...")
+	deployer := chaincode.NewDeployer(net, dockerMgr, executor.NewRealExecutor())
+	req := &chaincode.DeployRequest{
+		Name:     "asset-transfer",
+		Path:     "chaincode/asset-transfer",
+		Version:  "1.0",
+		Language: "golang",
+	}
+	ccID, err := deployer.Deploy(ctx, req)
+	if err != nil {
+		t.Fatalf("Failed to deploy chaincode: %v", err)
+	}
+	if ccID == "" {
+		t.Fatal("Expected chaincode ID to be set")
+	}
+	t.Logf("✓ Chaincode deployed: %s", ccID)
+
+	// Step 6: Invoke transaction
+	t.Log("Step 6: Invoking transaction...")
+	invoker := chaincode.NewInvoker(net, executor.NewRealExecutor())
+	txID, _, err := invoker.Invoke(ctx, "asset-transfer", "CreateAsset", []string{"asset1", "blue", "5", "Tom", "35"})
+	if err != nil {
+		t.Fatalf("Failed to invoke transaction: %v", err)
+	}
+	if txID == "" || txID == "unknown" {
+		t.Fatalf("Expected valid transaction ID, got: %s", txID)
+	}
+	t.Logf("✓ Transaction invoked: %s", txID)
+
+	// Step 7: Query ledger
+	t.Log("Step 7: Querying ledger...")
+	result, err := invoker.Query(ctx, "asset-transfer", "ReadAsset", []string{"asset1"})
+	if err != nil {
+		t.Fatalf("Failed to query ledger: %v", err)
+	}
+	if len(result) == 0 {
+		t.Fatal("Expected non-empty query result")
+	}
+	t.Logf("✓ Query result: %s", string(result))
+
+	// Step 8: Verify result
+	t.Log("Step 8: Verifying result...")
+	expected := `{"ID":"asset1","Color":"blue","Size":5,"Owner":"Tom","AppraisedValue":35}`
+	if string(result) != expected {
+		t.Fatalf("Expected query result '%s', got '%s'", expected, string(result))
+	}
+	t.Log("✓ Result verified")
 
 	t.Log("✓ Full lifecycle test completed successfully")
 }
@@ -92,13 +134,14 @@ func TestMockFullLifecycle(t *testing.T) {
 	mockExec := executor.NewMockExecutor()
 	mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		// Simulate successful docker operations
-		if len(args) > 0 {
-			switch args[len(args)-1] {
-			case "queryinstalled":
-				return []byte("Package ID: testcc_1.0:hash123, Label: testcc_1.0"), nil
-			default:
-				return []byte("success"), nil
-			}
+		if contains(args, "queryinstalled") {
+			return []byte("Package ID: testcc_1.0:hash123, Label: testcc_1.0"), nil
+		}
+		if contains(args, "invoke") {
+			return []byte("Chaincode invoke successful. result: status:200 txid [tx123abc456] committed with status (VALID)"), nil
+		}
+		if contains(args, "query") {
+			return []byte(`{"id":"asset1","value":"value1"}`), nil
 		}
 		return []byte("success"), nil
 	}
@@ -161,7 +204,10 @@ func TestMockFullLifecycle(t *testing.T) {
 
 	// Mock transaction response
 	mockExec.ExecuteCombinedFunc = func(ctx context.Context, name string, args ...string) ([]byte, error) {
-		return []byte("Chaincode invoke successful. txid:tx123abc456"), nil
+		if contains(args, "invoke") {
+			return []byte("Chaincode invoke successful. result: status:200 txid [tx123abc456] committed with status (VALID)"), nil
+		}
+		return []byte("success"), nil
 	}
 
 	txID, _, err := invoker.Invoke(ctx, "testcc", "createAsset", []string{"asset1", "value1"})
@@ -434,4 +480,13 @@ func BenchmarkFullLifecycle(b *testing.B) {
 		dockerMgr.StopNetwork(ctx, net, true)
 		net.Cleanup()
 	}
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
