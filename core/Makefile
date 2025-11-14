@@ -118,6 +118,7 @@ install: build
 # Clean build artifacts
 clean:
 	@echo "🧹 Cleaning..."
+	@docker-compose -f config/docker-compose-fabric.yaml down -v --remove-orphans
 	rm -rf bin/
 	rm -rf $(COVERAGE_DIR)/
 	rm -f coverage.out coverage.html
