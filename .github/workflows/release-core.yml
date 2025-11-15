@@ -3,7 +3,7 @@ name: Release Core Runtime
 on:
   push:
     tags:
-      - 'core-v*'
+      - 'v*'
 
 jobs:
   build:
@@ -35,7 +35,7 @@ jobs:
       
       - name: Get version
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/core-v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       
       - name: Build
         working-directory: ./core
