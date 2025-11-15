@@ -1,12 +1,19 @@
 {
   "name": "@fabricx/sdk",
-  "version": "1.0.0",
-  "description": "Production-grade TypeScript SDK for FabricX - A developer-friendly toolkit for Hyperledger Fabric",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "type": "module",
+  "version": "1.0.1",
+  "description": "TypeScript SDK for FabricX - A developer-friendly toolkit for Hyperledger Fabric",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    }
+  },
   "scripts": {
-    "build": "tsc && npm run copy-proto",
+    "build": "tsup && npm run copy-proto",
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
     "copy-proto": "mkdir -p dist/protos && cp ../core/protos/fabricx.proto dist/protos/",
@@ -55,8 +62,10 @@
     "@grpc/grpc-js": "^1.10.0",
     "@grpc/proto-loader": "^0.7.12"
   },
-  "peerDependencies": {},
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1"
   }
 }

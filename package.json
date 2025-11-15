@@ -3,12 +3,9 @@
   "version": "1.0.0",
   "description": "FabricX Developer Toolkit Monorepo",
   "private": true,
-  "workspaces": [
-    "cli",
-    "sdk"
-  ],
   "scripts": {
-    "build": "npm run build --workspace cli --workspace sdk",
+    "build": "npm run build --workspace=sdk && npm run build --workspace=cli",
+    "clean": "npm run clean --workspace=sdk && npm run clean --workspace=cli",
     "test": "npm test --workspace cli --workspace sdk"
   },
   "devDependencies": {

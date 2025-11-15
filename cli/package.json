@@ -1,19 +1,18 @@
 {
   "name": "@fabricx/cli",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Command-line interface for FabricX Developer Toolkit",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "bin": {
     "fabricx": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc --watch",
+    "build": "tsup",
+    "watch": "tsup --watch",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run clean && npm run build",
-    "dev": "ts-node src/index.ts",
+    "dev": "tsx src/index.ts",
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
@@ -47,9 +46,9 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@fabricx/sdk": "1.0.0",
-    "commander": "^12.1.0",
+    "@fabricx/sdk": "1.0.1",
     "chalk": "^5.3.0",
+    "commander": "^12.1.0",
     "ora": "^8.0.1"
   },
   "devDependencies": {
@@ -59,7 +58,8 @@
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.2.5",
-    "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
+    "tsx": "^3.14.0",
     "typescript": "^5.4.5"
   },
   "publishConfig": {
