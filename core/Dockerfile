@@ -2,7 +2,7 @@
 # Multi-stage build for FabricX Runtime
 
 # Stage 1: Build the Go binary
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git make protobuf-dev protobuf
