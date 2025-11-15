@@ -1,0 +1,33 @@
+name: Release Core Runtime
+
+on:
+  push:
+    tags:
+      - 'core-v*'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+      
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/core-v}" >> $GITHUB_OUTPUT
+      
+      - name: Build
+        working-directory: ./core
+        run: make VERSION=${{ steps.version.outputs.VERSION }} release
+      
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: core/releases/${{ steps.version.outputs.VERSION }}/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
