@@ -9,6 +9,12 @@ GO_FILES=$(shell find . -name '*.go' -type f -not -path "./vendor/*")
 PROTO_FILES=$(shell find $(PROTO_DIR) -name '*.proto' -type f)
 COVERAGE_DIR=coverage
 
+VERSION ?= 0.1.0
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.gitCommit=$(GIT_COMMIT) -X main.buildDate=$(BUILD_DATE)"
+
 all: deps proto build client
 
 # Install dependencies
@@ -28,26 +34,53 @@ proto:
 
 # Build the binary
 build: proto
-	@echo "🏗️  Building $(BINARY_NAME)..."
-	go build -o bin/$(BINARY_NAME) main.go
+	@echo "🏗️  Building $(BINARY_NAME) v$(VERSION)..."
+	go build $(LDFLAGS) -o bin/$(BINARY_NAME) main.go
 
 # Build the client
 client: proto
 	@echo "🏗️  Building $(CLIENT_NAME)..."
 	go build -o bin/$(CLIENT_NAME) cmd/client/main.go
 
-# Build for multiple platforms
-build-all: proto
-	@echo "🌍 Building for multiple platforms..."
-	GOOS=linux GOARCH=amd64 go build -o bin/$(BINARY_NAME)-linux-amd64 main.go
-	GOOS=darwin GOARCH=amd64 go build -o bin/$(BINARY_NAME)-darwin-amd64 main.go
-	GOOS=darwin GOARCH=arm64 go build -o bin/$(BINARY_NAME)-darwin-arm64 main.go
-	GOOS=windows GOARCH=amd64 go build -o bin/$(BINARY_NAME)-windows-amd64.exe main.go
-	@echo "🌍 Building client for multiple platforms..."
-	GOOS=linux GOARCH=amd64 go build -o bin/$(CLIENT_NAME)-linux-amd64 cmd/client/main.go
-	GOOS=darwin GOARCH=amd64 go build -o bin/$(CLIENT_NAME)-darwin-amd64 cmd/client/main.go
-	GOOS=darwin GOARCH=arm64 go build -o bin/$(CLIENT_NAME)-darwin-arm64 cmd/client/main.go
-	GOOS=windows GOARCH=amd64 go build -o bin/$(CLIENT_NAME)-windows-amd64.exe cmd/client/main.go
+# Build for all platforms with compression
+build-release: proto
+	@echo "🌍 Building release binaries for v$(VERSION)..."
+	@mkdir -p releases/$(VERSION)
+	
+	# Linux AMD64
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-linux-amd64 main.go
+	tar -czf releases/$(VERSION)/fabricx-runtime-$(VERSION)-linux-amd64.tar.gz -C bin $(BINARY_NAME)-linux-amd64
+	
+	# Linux ARM64
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-linux-arm64 main.go
+	tar -czf releases/$(VERSION)/fabricx-runtime-$(VERSION)-linux-arm64.tar.gz -C bin $(BINARY_NAME)-linux-arm64
+	
+	# macOS AMD64 (Intel)
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-darwin-amd64 main.go
+	tar -czf releases/$(VERSION)/fabricx-runtime-$(VERSION)-darwin-amd64.tar.gz -C bin $(BINARY_NAME)-darwin-amd64
+	
+	# macOS ARM64 (Apple Silicon)
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-darwin-arm64 main.go
+	tar -czf releases/$(VERSION)/fabricx-runtime-$(VERSION)-darwin-arm64.tar.gz -C bin $(BINARY_NAME)-darwin-arm64
+	
+	# Windows AMD64
+	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o bin/$(BINARY_NAME)-windows-amd64.exe main.go
+	cd bin && zip ../releases/$(VERSION)/fabricx-runtime-$(VERSION)-windows-amd64.zip $(BINARY_NAME)-windows-amd64.exe
+	
+	@echo "✅ Release binaries created in releases/$(VERSION)/"
+	@ls -lh releases/$(VERSION)/
+
+# Generate checksums for release
+checksums:
+	@echo "🔐 Generating checksums..."
+	cd releases/$(VERSION) && shasum -a 256 * > SHA256SUMS
+	@echo "✅ Checksums generated"
+
+# Complete release build
+release: clean deps proto build-release checksums
+	@echo "🎉 Release v$(VERSION) ready!"
+	@echo "📦 Files:"
+	@ls -lh releases/$(VERSION)/
 
 # Run all tests
 test: test-unit

@@ -324,6 +324,8 @@ func queryLedger(client pb.FabricXServiceClient) {
 
 	fmt.Printf("\n✅ Query successful!\n")
 
+	fmt.Println(resp.Payload)
+
 	// Try to pretty-print JSON
 	var prettyJSON interface{}
 	if err := json.Unmarshal(resp.Payload, &prettyJSON); err == nil {
