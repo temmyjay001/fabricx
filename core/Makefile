@@ -151,7 +151,9 @@ install: build
 # Clean build artifacts
 clean:
 	@echo "🧹 Cleaning..."
-	@docker-compose -f config/docker-compose-fabric.yaml down -v --remove-orphans
+	@if command -v docker-compose > /dev/null; then \
+		docker-compose -f config/docker-compose-fabric.yaml down -v --remove-orphans; \
+	fi
 	rm -rf bin/
 	rm -rf $(COVERAGE_DIR)/
 	rm -f coverage.out coverage.html
