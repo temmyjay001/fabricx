@@ -12,6 +12,13 @@ The project consists of three main components:
 2.  **An SDK (`@fabricx/sdk`)**: Also in TypeScript, offering a programmatic interface to interact with Fabric networks.
 3.  **A Go Runtime Core (`core`)**: Handles the low-level interactions with Hyperledger Fabric, communicating with the TypeScript components via gRPC.
 
+## Published Packages
+
+The FabricX CLI and SDK are available on npm:
+
+*   **CLI**: [`@fabricx/cli`](https://www.npmjs.com/package/@fabricx/cli)
+*   **SDK**: [`@fabricx/sdk`](https://www.npmjs.com/package/@fabricx/sdk)
+
 ## Features
 
 *   **Simplified Network Management**: Easily initialize, deploy, and tear down local Fabric networks.
