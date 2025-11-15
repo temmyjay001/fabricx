@@ -1,9 +1,10 @@
 // sdk/src/grpc/client.ts
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import { promisify } from "util";
-import path from "path";
-import { FabricXError } from "../types";
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
+import { promisify } from 'util';
+import path from 'path';
+
+import { FabricXError } from '../types';
 
 /**
  * gRPC client configuration
@@ -154,7 +155,7 @@ export class GrpcClient {
 
   constructor(config?: GrpcClientConfig) {
     this.config = {
-      serverAddr: config?.serverAddr || "localhost:50051",
+      serverAddr: config?.serverAddr || 'localhost:50051',
       timeout: config?.timeout || 120000,
       useTls: config?.useTls || false,
       tlsConfig: config?.tlsConfig || {},
@@ -169,14 +170,14 @@ export class GrpcClient {
 
     // Setup channel options
     this.options = {
-      "grpc.keepalive_time_ms": this.config.keepAliveTime,
-      "grpc.keepalive_timeout_ms": this.config.keepAliveTimeout,
-      "grpc.keepalive_permit_without_calls": 1,
-      "grpc.http2.max_pings_without_data": 0,
-      "grpc.http2.min_time_between_pings_ms": 10000,
-      "grpc.http2.min_ping_interval_without_data_ms": 5000,
-      "grpc.max_receive_message_length": 100 * 1024 * 1024, // 100MB
-      "grpc.max_send_message_length": 100 * 1024 * 1024, // 100MB
+      'grpc.keepalive_time_ms': this.config.keepAliveTime,
+      'grpc.keepalive_timeout_ms': this.config.keepAliveTimeout,
+      'grpc.keepalive_permit_without_calls': 1,
+      'grpc.http2.max_pings_without_data': 0,
+      'grpc.http2.min_time_between_pings_ms': 10000,
+      'grpc.http2.min_ping_interval_without_data_ms': 5000,
+      'grpc.max_receive_message_length': 100 * 1024 * 1024, // 100MB
+      'grpc.max_send_message_length': 100 * 1024 * 1024, // 100MB
     };
 
     this.client = null;
@@ -192,7 +193,7 @@ export class GrpcClient {
 
     try {
       // Load proto file
-      const protoPath = path.join(__dirname, "../../protos/fabricx.proto");
+      const protoPath = path.join(__dirname, 'protos/fabricx.proto');
       const packageDefinition = await protoLoader.load(protoPath, {
         keepCase: true,
         longs: String,
@@ -201,17 +202,11 @@ export class GrpcClient {
         oneofs: true,
       });
 
-      const protoDescriptor = grpc.loadPackageDefinition(
-        packageDefinition
-      ) as any;
+      const protoDescriptor = grpc.loadPackageDefinition(packageDefinition) as any;
       const FabricXService = protoDescriptor.fabricx.FabricXService;
 
       // Create client
-      this.client = new FabricXService(
-        this.config.serverAddr,
-        this.credentials,
-        this.options
-      );
+      this.client = new FabricXService(this.config.serverAddr, this.credentials, this.options);
 
       // Wait for connection
       await this.waitForReady();
@@ -219,7 +214,7 @@ export class GrpcClient {
     } catch (error) {
       throw new FabricXError(
         `Failed to initialize gRPC client: ${(error as Error).message}`,
-        "INITIALIZATION_ERROR",
+        'INITIALIZATION_ERROR',
         { error, serverAddr: this.config.serverAddr }
       );
     }
@@ -236,11 +231,10 @@ export class GrpcClient {
       this.client.waitForReady(deadline, (error: Error | undefined) => {
         if (error) {
           reject(
-            new FabricXError(
-              "Failed to connect to FabricX runtime",
-              "CONNECTION_ERROR",
-              { error, serverAddr: this.config.serverAddr }
-            )
+            new FabricXError('Failed to connect to FabricX runtime', 'CONNECTION_ERROR', {
+              error,
+              serverAddr: this.config.serverAddr,
+            })
           );
         } else {
           resolve();
@@ -280,21 +274,16 @@ export class GrpcClient {
    */
   async initNetwork(request: InitNetworkRequest): Promise<InitNetworkResponse> {
     await this.ensureConnected();
-    return this.makeUnaryCall<InitNetworkRequest, InitNetworkResponse>(
-      "InitNetwork",
-      request
-    );
+    return this.makeUnaryCall<InitNetworkRequest, InitNetworkResponse>('InitNetwork', request);
   }
 
   /**
    * Deploy chaincode
    */
-  async deployChaincode(
-    request: DeployChaincodeRequest
-  ): Promise<DeployChaincodeResponse> {
+  async deployChaincode(request: DeployChaincodeRequest): Promise<DeployChaincodeResponse> {
     await this.ensureConnected();
     return this.makeUnaryCall<DeployChaincodeRequest, DeployChaincodeResponse>(
-      "DeployChaincode",
+      'DeployChaincode',
       request
     );
   }
@@ -302,14 +291,12 @@ export class GrpcClient {
   /**
    * Invoke a transaction
    */
-  async invokeTransaction(
-    request: InvokeTransactionRequest
-  ): Promise<InvokeTransactionResponse> {
+  async invokeTransaction(request: InvokeTransactionRequest): Promise<InvokeTransactionResponse> {
     await this.ensureConnected();
-    return this.makeUnaryCall<
-      InvokeTransactionRequest,
-      InvokeTransactionResponse
-    >("InvokeTransaction", request);
+    return this.makeUnaryCall<InvokeTransactionRequest, InvokeTransactionResponse>(
+      'InvokeTransaction',
+      request
+    );
   }
 
   /**
@@ -317,21 +304,16 @@ export class GrpcClient {
    */
   async queryLedger(request: QueryLedgerRequest): Promise<QueryLedgerResponse> {
     await this.ensureConnected();
-    return this.makeUnaryCall<QueryLedgerRequest, QueryLedgerResponse>(
-      "QueryLedger",
-      request
-    );
+    return this.makeUnaryCall<QueryLedgerRequest, QueryLedgerResponse>('QueryLedger', request);
   }
 
   /**
    * Get network status
    */
-  async getNetworkStatus(
-    request: NetworkStatusRequest
-  ): Promise<NetworkStatusResponse> {
+  async getNetworkStatus(request: NetworkStatusRequest): Promise<NetworkStatusResponse> {
     await this.ensureConnected();
     return this.makeUnaryCall<NetworkStatusRequest, NetworkStatusResponse>(
-      "GetNetworkStatus",
+      'GetNetworkStatus',
       request
     );
   }
@@ -341,10 +323,7 @@ export class GrpcClient {
    */
   async stopNetwork(request: StopNetworkRequest): Promise<StopNetworkResponse> {
     await this.ensureConnected();
-    return this.makeUnaryCall<StopNetworkRequest, StopNetworkResponse>(
-      "StopNetwork",
-      request
-    );
+    return this.makeUnaryCall<StopNetworkRequest, StopNetworkResponse>('StopNetwork', request);
   }
 
   /**
@@ -361,12 +340,12 @@ export class GrpcClient {
     return new Promise((resolve, reject) => {
       const call = this.client.StreamLogs(request);
 
-      call.on("data", (message: LogMessage) => {
+      call.on('data', (message: LogMessage) => {
         onData(message);
       });
 
-      call.on("error", (error: grpc.ServiceError) => {
-        const fabricxError = this.convertGrpcError(error, "StreamLogs");
+      call.on('error', (error: grpc.ServiceError) => {
+        const fabricxError = this.convertGrpcError(error, 'StreamLogs');
         if (onError) {
           onError(fabricxError);
         } else {
@@ -374,7 +353,7 @@ export class GrpcClient {
         }
       });
 
-      call.on("end", () => {
+      call.on('end', () => {
         if (onEnd) {
           onEnd();
         }
@@ -424,7 +403,7 @@ export class GrpcClient {
     deadline.setMilliseconds(deadline.getMilliseconds() + this.config.timeout);
 
     const metadata = new grpc.Metadata();
-    metadata.set("request-id", this.generateRequestId());
+    metadata.set('request-id', this.generateRequestId());
 
     const callOptions: grpc.CallOptions = {
       deadline,
@@ -468,49 +447,46 @@ export class GrpcClient {
   /**
    * Convert gRPC error to FabricXError
    */
-  private convertGrpcError(
-    error: grpc.ServiceError,
-    method: string
-  ): FabricXError {
+  private convertGrpcError(error: grpc.ServiceError, method: string): FabricXError {
     let code: string;
     let message: string;
 
     switch (error.code) {
       case grpc.status.UNAVAILABLE:
-        code = "CONNECTION_ERROR";
+        code = 'CONNECTION_ERROR';
         message = `FabricX runtime is unavailable at ${this.config.serverAddr}`;
         break;
       case grpc.status.DEADLINE_EXCEEDED:
-        code = "TIMEOUT";
+        code = 'TIMEOUT';
         message = `Request timeout after ${this.config.timeout}ms`;
         break;
       case grpc.status.UNAUTHENTICATED:
-        code = "AUTHENTICATION_ERROR";
-        message = "Authentication failed";
+        code = 'AUTHENTICATION_ERROR';
+        message = 'Authentication failed';
         break;
       case grpc.status.PERMISSION_DENIED:
-        code = "PERMISSION_DENIED";
-        message = "Permission denied";
+        code = 'PERMISSION_DENIED';
+        message = 'Permission denied';
         break;
       case grpc.status.INVALID_ARGUMENT:
-        code = "INVALID_ARGUMENT";
-        message = "Invalid request parameters";
+        code = 'INVALID_ARGUMENT';
+        message = 'Invalid request parameters';
         break;
       case grpc.status.NOT_FOUND:
-        code = "NOT_FOUND";
-        message = "Resource not found";
+        code = 'NOT_FOUND';
+        message = 'Resource not found';
         break;
       case grpc.status.ALREADY_EXISTS:
-        code = "ALREADY_EXISTS";
-        message = "Resource already exists";
+        code = 'ALREADY_EXISTS';
+        message = 'Resource already exists';
         break;
       case grpc.status.INTERNAL:
-        code = "INTERNAL_ERROR";
-        message = "Internal server error";
+        code = 'INTERNAL_ERROR';
+        message = 'Internal server error';
         break;
       default:
-        code = "GRPC_ERROR";
-        message = error.message || "Unknown gRPC error";
+        code = 'GRPC_ERROR';
+        message = error.message || 'Unknown gRPC error';
     }
 
     return new FabricXError(message, code, {
@@ -541,24 +517,24 @@ export class GrpcClient {
    */
   getConnectionState(): string {
     if (!this.client) {
-      return "NOT_INITIALIZED";
+      return 'NOT_INITIALIZED';
     }
 
     const state = this.client.getChannel().getConnectivityState(false);
 
     switch (state) {
       case grpc.connectivityState.IDLE:
-        return "IDLE";
+        return 'IDLE';
       case grpc.connectivityState.CONNECTING:
-        return "CONNECTING";
+        return 'CONNECTING';
       case grpc.connectivityState.READY:
-        return "READY";
+        return 'READY';
       case grpc.connectivityState.TRANSIENT_FAILURE:
-        return "TRANSIENT_FAILURE";
+        return 'TRANSIENT_FAILURE';
       case grpc.connectivityState.SHUTDOWN:
-        return "SHUTDOWN";
+        return 'SHUTDOWN';
       default:
-        return "UNKNOWN";
+        return 'UNKNOWN';
     }
   }
 
@@ -567,7 +543,7 @@ export class GrpcClient {
    */
   watchConnectionState(callback: (state: string) => void): () => void {
     if (!this.client) {
-      throw new FabricXError("Client not initialized", "NOT_INITIALIZED");
+      throw new FabricXError('Client not initialized', 'NOT_INITIALIZED');
     }
 
     const channel = this.client.getChannel();
@@ -582,15 +558,11 @@ export class GrpcClient {
       const deadline = new Date();
       deadline.setSeconds(deadline.getSeconds() + 5);
 
-      channel.watchConnectivityState(
-        currentState,
-        deadline,
-        (error: Error | undefined) => {
-          if (!error && watching) {
-            watch();
-          }
+      channel.watchConnectivityState(currentState, deadline, (error: Error | undefined) => {
+        if (!error && watching) {
+          watch();
         }
-      );
+      });
     };
 
     watch();
