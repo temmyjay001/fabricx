@@ -77,7 +77,7 @@ checksums:
 	@echo "✅ Checksums generated"
 
 # Complete release build
-release: clean deps proto build-release checksums
+release: deps proto build-release checksums
 	@echo "🎉 Release v$(VERSION) ready!"
 	@echo "📦 Files:"
 	@ls -lh releases/$(VERSION)/
